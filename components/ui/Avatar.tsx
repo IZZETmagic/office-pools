@@ -49,6 +49,7 @@ export function Avatar({
   size = 24,
   fontSize,
   ring = false,
+  gradient,
   className = '',
 }: {
   person: AvatarPerson
@@ -75,6 +76,15 @@ export function Avatar({
    * card and OnlineMembersStrip both already use.
    */
   ring?: boolean
+  /**
+   * A CSS gradient to paint instead of the member's own.
+   *
+   * ⚠ FOR A DUEL, AND ONLY THERE. Two members who are the same colour must not
+   * meet as one colour facing itself, so the pair is resolved TOGETHER
+   * (`duelColourIndices`) and one side may be moved. Everywhere else a member is
+   * their own colour — leave this unset.
+   */
+  gradient?: string
   className?: string
 }) {
   return (
@@ -86,7 +96,7 @@ export function Avatar({
         width: size,
         height: size,
         fontSize: fontSize ?? (typeof size === 'number' ? Math.round(size * 0.38) : undefined),
-        backgroundImage: avatarGradient(person.user_id, person.avatar_colour),
+        backgroundImage: gradient ?? avatarGradient(person.user_id, person.avatar_colour),
       }}
     >
       {getInitials(person.full_name, person.username)}

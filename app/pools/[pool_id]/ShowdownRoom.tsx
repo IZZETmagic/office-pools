@@ -26,9 +26,21 @@
 // ## ⚠ AN OPEN WEEK HAS NO RIVALS' PICKS, AND THAT IS NOT AN EMPTY WEEK
 //
 // `/bulk` withholds a matchweek that is still open for picks. So the current
-// week's card lists its duels and its fixtures with nobody's picks beside them,
-// and it has to say "not yet" rather than render blanks that read as "nobody
-// picked". Nothing here may reconstruct a pick from another source.
+// week's card lists its fixtures with a dash where each rival's pick will be,
+// and SAYS so under the sheet — a bare dash reads as "nobody picked". Nothing
+// here may reconstruct a pick from another source.
+//
+// ⚠⚠ "`/bulk` WITHHOLDS IT" WAS FALSE FOR THE POOL ADMIN UNTIL 2026-10-09: the
+// route handed admins every pick, locked or not. It now gates league admins
+// like everyone else (`bypassesRevealGate`), and this screen ALSO refuses to
+// draw a rival's pick for a week that has not locked — a second wall.
+//
+// ## LAYOUT — THE APP'S, SINCE 2026-10-09
+//
+// Ryan asked for the phone's Room on the web too: avatar OVER name on each
+// card (names get two lines rather than truncating), no chevron — a line under
+// the matchweek title says a card opens — and no names row inside the opened
+// sheet, since the faces above each column already say whose it is.
 //
 // ## ⚠ NOTHING HERE SCORES ANYTHING
 //
@@ -40,15 +52,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
-import { avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
-import type { AvatarPerson } from '@/components/ui/Avatar'
+import {
+  AVATAR_GRADIENTS,
+  avatarInk,
+  duelColourIndices,
+  inkFromIndex,
+  type AvatarInk,
+} from '@/lib/design/avatarGradient'
 import { buildSheet, sheetSummary, type SheetFixture, type SheetLive } from '@/lib/league/duelSheet'
 import { duelResult } from '@/lib/league/duelPoints'
 import type { DuelRow } from '@/lib/league/duels'
 import { matchweekFixtures, type SeasonMatch } from '@/lib/league/matchweekFixtures'
-import { DuelSide, Scoreline, TeamSheetRows } from './TeamSheet'
+import { Scoreline, TeamSheetRows } from './TeamSheet'
 
 type Props = {
   poolId: string
@@ -61,6 +79,11 @@ type Props = {
   matches: SeasonMatch[]
   /** Being played right now. Null between rounds. */
   inPlayMatchweek: number | null
+  /**
+   * Open for picks — so every week BEFORE it has locked, and a rival's pick may
+   * be shown for it. Null when nothing is open: everything shown has locked.
+   */
+  openMatchweek: number | null
   /**
    * A matchweek whose duel has opened in RLS but whose walkout this member has
    * not watched — withheld from the switcher until they have.
@@ -95,7 +118,7 @@ const EMPTY: WeekPoints = { perFixture: new Map(), points: new Map() }
 
 export function ShowdownRoom({
   poolId, duels, entryNames, entryPeople, ownEntryIds, matches,
-  inPlayMatchweek, unwatchedMatchweek, leagueOutcomes, allPredictions, bulkState,
+  inPlayMatchweek, openMatchweek, unwatchedMatchweek, leagueOutcomes, allPredictions, bulkState,
   livePerFixture,
 }: Props) {
   /**
@@ -268,8 +291,17 @@ export function ShowdownRoom({
   }, [entryPeople])
 
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
+
+  /**
+   * Has the week on screen LOCKED — may a rival's pick be shown at all?
+   *
+   * ⚠ FROM THE OPEN MATCHWEEK, the same reading the app makes: the open week is
+   * the one being picked, so every week before it has locked, and the server
+   * worked that out against its own clock when it rendered this page.
+   */
+  const picksRevealed = shown !== null && (openMatchweek === null || shown < openMatchweek)
   const name = useCallback(
-    (id: string | null) => (id === null ? 'Bye' : entryNames.get(id) ?? 'Unknown'),
+    (id: string | null) => (id === null ? 'Nobody' : entryNames.get(id) ?? 'Unknown'),
     [entryNames],
   )
 
@@ -316,6 +348,11 @@ export function ShowdownRoom({
         <Step icon="chevron.right" label="Next matchweek"
               enabled={canForward} onClick={() => { setWeek(revealedWeeks[i + 1]); setOpenDuel(null) }} />
       </div>
+      {/* ⚠ THE CARDS LOST THEIR CHEVRON — Ryan, 2026-10-09 — so this line is
+          now the only thing that says a card opens. His wording, as on the app. */}
+      <p className="t-detail text-muted text-center -mt-2">
+        Tap on a matchup to see their predictions.
+      </p>
 
       {weekDuels.map((d) => (
         <DuelCard
@@ -333,7 +370,8 @@ export function ShowdownRoom({
           points={weekPoints.points}
           pickLabel={pickLabel}
           bulkState={bulkState}
-          matchweek={shown}
+          own={own}
+          picksRevealed={picksRevealed}
         />
       ))}
     </div>
@@ -342,9 +380,12 @@ export function ShowdownRoom({
 
 // -------------------------------------------------------------- one duel
 
+/** The face on a matchup card — the app's 44, in px. */
+const FACE = 44
+
 function DuelCard({
   duel, name, person, isYours, open, onToggle,
-  fixtures, live, inkFor, perFixture, points, pickLabel, bulkState, matchweek,
+  fixtures, live, inkFor, perFixture, points, pickLabel, bulkState, own, picksRevealed,
 }: {
   duel: DuelRow
   name: (id: string | null) => string
@@ -359,7 +400,8 @@ function DuelCard({
   points: Map<string, number>
   pickLabel: (entryId: string, fixtureId: string) => string | null
   bulkState: 'idle' | 'loading' | 'ready' | 'error'
-  matchweek: number
+  own: Set<string>
+  picksRevealed: boolean
 }) {
   const settled = !!duel.settled_at
   // ⚠ `duelResult` FROM SIDE A'S COLUMN, never a literal — a win has been 500
@@ -399,8 +441,7 @@ function DuelCard({
    * ⚠ A SETTLED DUEL IS READ OFF THE POINTS COLUMN, NOT OFF THE SCORELINE.
    * `points_a` is what the engine paid and `duelResult` is what turns it back
    * into won/tied/lost; comparing the two accuracies again would be a second
-   * opinion about a result that already has one, and the two would part company
-   * the moment a rescore changed one without the other.
+   * opinion about a result that already has one.
    *
    * Only an UNSETTLED duel has no verdict to read, and there the running
    * scoreline is all there is.
@@ -411,40 +452,109 @@ function DuelCard({
       ? null
       : left > right ? 'a' : 'b'
 
+  const personA = person(duel.entry_a)
+  const personB = person(duel.entry_b)
+
+  /**
+   * Both colours, resolved AGAINST EACH OTHER — the Duel tab's rule, and the
+   * app Room's.
+   *
+   * ⚠ `duelColourIndices`, not each member's own colour. Two teal members would
+   * otherwise meet as one colour facing itself — on the faces AND on the two pick
+   * columns underneath, which is the one place the colours must tell the sides
+   * apart. Null when either side has no person (a bye): each falls back to its own.
+   */
+  const pair =
+    personA && personB && duel.entry_b
+      ? duelColourIndices(
+          { entryId: duel.entry_a, userId: personA.user_id, chosen: personA.avatar_colour },
+          { entryId: duel.entry_b, userId: personB.user_id, chosen: personB.avatar_colour },
+        )
+      : null
+  const gradientOf = (i: number) => `linear-gradient(135deg, ${AVATAR_GRADIENTS[i][0]}, ${AVATAR_GRADIENTS[i][1]})`
+  const aInk = pair ? inkFromIndex(pair.a) : inkFor(duel.entry_a)
+  const bInk = pair ? inkFromIndex(pair.b) : inkFor(duel.entry_b)
+
   return (
     <Card padding="none" className={`overflow-hidden ${isYours ? 'ring-1 ring-primary-500/50' : ''}`}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full text-left px-4 sm:px-5 py-3.5 hover:bg-mist/50 transition-colors"
+        aria-label={`${name(duel.entry_a)} against ${name(duel.entry_b)} — ${open ? 'hide' : 'show'} their predictions`}
+        className="w-full px-4 sm:px-5 py-4 sm:py-5 hover:bg-mist/50 transition-colors"
       >
-        <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3 sm:gap-5">
-          <DuelSide name={name(duel.entry_a)} person={person(duel.entry_a)}
-                    leading={lead === 'a'} dimmed={lead === 'b'} />
-          {duel.entry_b === null ? (
-            // ⚠ A BYE IS STRUCTURAL — `entry_b IS NULL` — and is never read off
-            // the points. `DUEL_BYE === DUEL_TIE === 250`, so a value test calls
-            // it a draw against an opponent who never existed.
-            <span className="t-caption text-muted">bye</span>
-          ) : (
-            <Scoreline left={left} right={right} />
-          )}
-          <DuelSide name={name(duel.entry_b)} person={person(duel.entry_b)}
-                    leading={lead === 'b'} dimmed={lead === 'a'} align="right" />
-          <Icon name={open ? 'chevron.up' : 'chevron.down'} size={12}
-                className="text-muted/60" />
+        {/*
+          ⚠ AVATAR OVER NAME — the app's shape, Ryan 2026-10-09. Side by side,
+          a face split each half and long names ("Quantum Quark") truncated;
+          stacked, each name has its half and two lines.
+
+          ⚠ NO CHEVRON, so the two corners are equal `1fr` columns and the
+          score sits on the card's centre by construction.
+        */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-5">
+          <Corner name={name(duel.entry_a)} person={personA}
+                  gradient={pair ? gradientOf(pair.a) : undefined}
+                  leading={lead === 'a'} dimmed={lead === 'b'} />
+          {/* Centred on the FACES, not on the column — the band sets its clock
+              level with the avatars the same way. */}
+          <div className="flex items-center justify-center" style={{ height: FACE }}>
+            {duel.entry_b === null ? (
+              // ⚠ A BYE IS STRUCTURAL — `entry_b IS NULL` — and is never read off
+              // the points. `DUEL_BYE === DUEL_TIE === 250`, so a value test calls
+              // it a draw against an opponent who never existed.
+              <span className="t-caption text-muted">bye</span>
+            ) : (
+              <Scoreline left={left} right={right} />
+            )}
+          </div>
+          <Corner name={name(duel.entry_b)} person={personB}
+                  gradient={pair ? gradientOf(pair.b) : undefined}
+                  leading={lead === 'b'} dimmed={lead === 'a'}
+                  empty={duel.entry_b === null} />
         </div>
       </button>
 
       {open && (
         <Sheets
           duel={duel} name={name} fixtures={fixtures} live={live}
-          inkFor={inkFor} perFixture={perFixture} pickLabel={pickLabel}
-          bulkState={bulkState} matchweek={matchweek}
+          aInk={aInk} bInk={bInk} perFixture={perFixture} pickLabel={pickLabel}
+          bulkState={bulkState} own={own} picksRevealed={picksRevealed} isYours={isYours}
         />
       )}
     </Card>
+  )
+}
+
+/**
+ * One side of a matchup: the face, then the name under it.
+ *
+ * ⚠ A BYE'S EMPTY CORNER NAMES ITSELF — "Nobody", on a plain ground, as the
+ * app's does. Not a lock: nothing is being withheld.
+ */
+function Corner({
+  name, person, gradient, leading, dimmed, empty = false,
+}: {
+  name: string
+  person: AvatarPerson | null
+  /** This side's colour after `duelColourIndices`, or undefined for their own. */
+  gradient?: string
+  leading: boolean
+  dimmed: boolean
+  empty?: boolean
+}) {
+  return (
+    <span className={`flex flex-col items-center gap-2 min-w-0 ${dimmed ? 'opacity-55' : ''}`}>
+      {person
+        ? <Avatar person={person} size={FACE} gradient={gradient} />
+        : <span className="rounded-pill bg-mist shrink-0" style={{ width: FACE, height: FACE }} aria-hidden="true" />}
+      {/* Two lines, not one: "Quantum Quark" wraps rather than losing its tail. */}
+      <span className={`t-body text-center line-clamp-2 break-words max-w-full ${
+        empty ? 'text-muted' : leading ? 'text-ink font-bold' : 'text-ink font-semibold'
+      }`}>
+        {name}
+      </span>
+    </span>
   )
 }
 
@@ -459,42 +569,57 @@ function DuelCard({
  * is why the picks are worth showing side by side rather than as two lists.
  */
 function Sheets({
-  duel, name, fixtures, live, inkFor, perFixture, pickLabel, bulkState, matchweek,
+  duel, name, fixtures, live, aInk, bInk, perFixture, pickLabel, bulkState, own, picksRevealed, isYours,
 }: {
   duel: DuelRow
   name: (id: string | null) => string
   fixtures: SheetFixture[]
   live: Map<number, SheetLive>
-  inkFor: (entry: string | null) => AvatarInk
+  /** `entry_a`'s column — left, under the left face. Resolved with `bInk`. */
+  aInk: AvatarInk
+  bInk: AvatarInk
   perFixture: Map<string, Map<number, number>>
   pickLabel: (entryId: string, fixtureId: string) => string | null
   bulkState: 'idle' | 'loading' | 'ready' | 'error'
-  matchweek: number
+  own: Set<string>
+  picksRevealed: boolean
+  isYours: boolean
 }) {
+  /**
+   * One pick, or null for a dash.
+   *
+   * ⚠⚠ A RIVAL'S PICK IS NULL UNTIL THE WEEK LOCKS, whatever the payload holds —
+   * Ryan, 2026-10-09. The server is the real wall (`/bulk` through
+   * `bypassesRevealGate`); this is the second one.
+   *
+   * ⚠ YOUR OWN STAY. They are yours to see at any time.
+   */
+  const label = useCallback(
+    (entryId: string, fixtureId: string) =>
+      !picksRevealed && !own.has(entryId) ? null : pickLabel(entryId, fixtureId),
+    [picksRevealed, own, pickLabel],
+  )
+
   const rows = useMemo(
     () => buildSheet({
       fixtures,
       live,
       mine: perFixture.get(duel.entry_a) ?? new Map<number, number>(),
       theirs: duel.entry_b ? perFixture.get(duel.entry_b) ?? new Map<number, number>() : new Map(),
-      label: pickLabel,
+      label,
       youEntry: duel.entry_a,
       themEntry: duel.entry_b,
     }),
-    [fixtures, live, perFixture, pickLabel, duel.entry_a, duel.entry_b],
+    [fixtures, live, perFixture, label, duel.entry_a, duel.entry_b],
   )
 
-  const summary = sheetSummary(rows)
-  const anyPicks = rows.some((r) => r.myPick !== null || r.theirPick !== null)
-
   /**
-   * ⚠ WHOSE COLUMN IS WHICH: `entry_a` left, `entry_b` right, matching the two
-   * names in the header above AND the two faces on the row that opened this.
-   * Orientation is presentational — the circle method's sides carry no meaning
-   * — but the colours must agree with the people or the sheet is unreadable.
+   * ⚠ ONLY ONCE THE WEEK HAS LOCKED. Against a column of dashes `sheetSummary`
+   * counts every row as agreement — it only calls a row different when BOTH
+   * picks are there — and would announce "Identical sheets" over a sheet nobody
+   * can see yet.
    */
-  const aInk = inkFor(duel.entry_a)
-  const bInk = inkFor(duel.entry_b)
+  const summary = picksRevealed && bulkState === 'ready' ? sheetSummary(rows) : null
 
   if (duel.entry_b === null) {
     return (
@@ -504,48 +629,34 @@ function Sheets({
     )
   }
 
-  // ⚠ NO PICKS AT ALL MEANS THE MATCHWEEK HAS NOT LOCKED, not that nobody
-  // picked — `/bulk` withholds an open week. Saying "not yet" is the only
-  // honest reading; blanks would accuse both members of skipping it.
-  //
-  // ⚠ AND ONLY ONCE THE BULK READ HAS LANDED. While it is loading, "picks open
-  // when the matchweek locks" would be stated about a week that locked in
-  // August.
-  if (!anyPicks) {
-    return (
-      <p className="t-body text-muted px-4 sm:px-5 pb-4 border-t border-border-default pt-4">
-        {bulkState === 'ready'
-          ? `Both team sheets open when matchweek ${matchweek} locks — an hour before the first kickoff.`
-          : 'Loading picks…'}
-      </p>
-    )
-  }
+  /**
+   * The line under the sheet. A dash means "not yet" before lock and "did not
+   * pick" after it, so only this tells a member which they are looking at.
+   *
+   * ⚠ AND "LOADING" ONLY AFTER LOCK. While `/bulk` is in flight a locked week's
+   * rivals are dashes too, and calling that "not yet" would be false about a
+   * week that locked in August.
+   */
+  const note = !picksRevealed
+    ? `${isYours ? "Your opponent's picks show" : 'Picks show'} when the matchweek locks — an hour before the first kickoff.`
+    : bulkState === 'error'
+      ? 'Picks did not load — refresh the page to try again.'
+      : bulkState !== 'ready'
+        ? 'Loading picks…'
+        : summary
 
   return (
-    <div className="border-t border-border-default">
-      <div className="grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 pt-4 pb-3">
-        <span className="t-caption truncate text-[var(--chip-strong)] dark:text-[var(--chip-soft)]"
-              style={{ '--chip-strong': aInk.strong, '--chip-soft': aInk.soft } as React.CSSProperties}>
-          {name(duel.entry_a)}
-        </span>
-        <span className="t-caption text-muted text-center">{rows.length} fixtures</span>
-        <span className="t-caption text-right truncate text-[var(--chip-strong)] dark:text-[var(--chip-soft)]"
-              style={{ '--chip-strong': bInk.strong, '--chip-soft': bInk.soft } as React.CSSProperties}>
-          {name(duel.entry_b)}
-        </span>
-      </div>
-
-      {/* ⚠ THE SAME SHEET THE DUEL TAB SHOWS. The phone shipped a thinner
-          version of this and it drifted the moment the Duel tab's row grew — a
-          member switching between the two tabs is comparing them directly. */}
+    // ⚠ NO NAMES ROW ANY MORE — Ryan, 2026-10-09. It repeated the two names the
+    // card shows, and the faces directly above each column now say whose it is.
+    // And no border here: the first row draws its own, which is the divider.
+    <div>
+      {/* ⚠ THE SAME SHEET THE DUEL TAB SHOWS. A member switching between the
+          two tabs is comparing them directly. */}
       <TeamSheetRows rows={rows} youInk={aInk} themInk={bInk} />
 
-      {/* Agreement is dead weight by definition: a fixture both called the same
-          way cannot separate them whatever it finishes. Saying how many is what
-          makes the rest mean something. */}
-      {summary && (
+      {note && (
         <p className="t-body text-muted px-3 sm:px-5 py-4 border-t border-border-default">
-          {summary}
+          {note}
         </p>
       )}
     </div>

@@ -3127,6 +3127,9 @@ export function PoolDetail({
                    rows the browser is holding. */
                 matches={matches}
                 inPlayMatchweek={showdownData.inPlayMatchweek}
+                /* Every week before the open one has locked — the Room shows a
+                   rival's pick only for those (2026-10-09). */
+                openMatchweek={showdownData.openMatchweek}
                 /* ⚠⚠ THE PHASE MACHINE'S ANSWER, NOT A SECOND ONE. "Revealed"
                    means two things — 116 reveals a duel to the DATABASE, the
                    walkout reveals it to the MEMBER — and the Room only ever knew
