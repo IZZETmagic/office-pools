@@ -11,6 +11,7 @@ import {
 } from '@/lib/design/clubColors';
 import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import type { LeagueStandingRow } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -109,14 +110,15 @@ export function LeagueTableSliceCard({
         La Liga.
       */}
       <Pressable
-        onPress={() =>
+        onPress={() => {
+          hapticCardTap();
           router.navigate({
             // ⚠ `season`, not `seasonId` — the Results screen reads
             // `useLocalSearchParams<{ view, season }>`.
             pathname: '/(tabs)/results',
             params: { view: 'tables', season: seasonId },
-          })
-        }
+          });
+        }}
         accessibilityRole="link"
         accessibilityLabel={`${competition ?? 'League'} table. Open the full table.`}
         style={({ pressed }) => ({

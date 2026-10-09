@@ -4,6 +4,7 @@ import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 import { getLiveClock } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
 
 type LiveMatchCardProps = {
@@ -16,7 +17,13 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
   const clock = getLiveClock(match);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
+    <Pressable
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
+    >
       <LinearGradient
         colors={['#0F0F1A', '#1A1830']}
         start={{ x: 0, y: 0 }}

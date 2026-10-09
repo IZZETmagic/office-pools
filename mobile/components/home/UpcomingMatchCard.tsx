@@ -7,6 +7,7 @@ import {
   fixturePalette,
 } from '@/lib/design/clubColors';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 type UpcomingMatchCardProps = {
@@ -50,7 +51,10 @@ export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

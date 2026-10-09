@@ -6,6 +6,7 @@ import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { getMatchStatusBadge } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
 import { clubOnSurface, fixturePalette } from '@/lib/design/clubColors';
 import { awayDisplayName, homeDisplayName } from '@/components/match/matchDisplay';
@@ -72,7 +73,13 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
   const badge = getMatchStatusBadge(match);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
+    <Pressable
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
+    >
       <LinearGradient
         colors={['#0F0F1A', '#1A1830']}
         start={{ x: 0, y: 0 }}

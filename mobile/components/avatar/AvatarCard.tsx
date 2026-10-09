@@ -6,6 +6,7 @@ import { SvgXml } from 'react-native-svg';
 
 import { Icon } from '@/components/ui';
 import { useMyAvatar } from '@/lib/useMyAvatar';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -137,7 +138,10 @@ export function AvatarCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={avatar?.hasAvatar ? 'Edit your avatar' : 'Build your avatar'}
-          onPress={() => router.push('/profile/avatar')}
+          onPress={() => {
+            hapticCardTap();
+            router.push('/profile/avatar');
+          }}
           style={{
             position: 'absolute',
             top: 12,

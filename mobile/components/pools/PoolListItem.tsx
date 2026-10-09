@@ -9,6 +9,7 @@ import { poolCardBlocks, type PoolCardBlock } from '@/lib/poolCardBlocks';
 import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { PoolSummary } from '@/lib/useHomeData';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // ⚠ MODE_LABEL AND MODE_GRADIENT ARE GONE, and neither was merely plainer than
@@ -152,7 +153,10 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
       onLongPress={showContextMenu}
       delayLongPress={350}
       style={({ pressed }) => ({

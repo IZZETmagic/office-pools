@@ -8,6 +8,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 
 import { avatarBackgroundFor, avatarIndexFor, groundInkFor } from '@/lib/avatarGradient';
 import type { ActivityItem, MentionMeta } from '@/lib/useActivity';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { relativeTime } from './ActivityCard';
@@ -27,7 +28,14 @@ export function MentionCard({ item, onPress }: { item: ActivityItem; onPress: ((
 
   return (
     <Pressable
-      onPress={onPress ?? undefined}
+      onPress={
+        onPress
+          ? () => {
+              hapticCardTap();
+              onPress();
+            }
+          : undefined
+      }
       accessibilityRole="button"
       accessibilityLabel={`${sender} mentioned you in ${m.pool_name}: ${m.message_preview ?? ''}`}
       style={({ pressed }) => ({

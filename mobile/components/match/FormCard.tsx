@@ -6,6 +6,7 @@ import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
 import { ClubBar, Text } from '@/components/ui';
 import type { FormResult } from '@/lib/matchContext';
 import type { ResultsMatch, ResultsTeam } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -186,7 +187,10 @@ function FormRow({
 
   return (
     <Pressable
-      onPress={() => router.push(`/match/${result.matchId}`)}
+      onPress={() => {
+        hapticCardTap();
+        router.push(`/match/${result.matchId}`);
+      }}
       accessibilityRole="button"
       accessibilityLabel={`${result.outcome === 'W' ? 'Won' : result.outcome === 'L' ? 'Lost' : 'Drew'} ${result.goalsFor}-${result.goalsAgainst} ${result.wasHome ? 'at home to' : 'away to'} ${result.opponent?.shortName ?? result.opponent?.countryName ?? 'unknown'}`}
       style={({ pressed }) => ({
@@ -412,7 +416,10 @@ function EarlierMeeting({ match, earlier }: { match: ResultsMatch; earlier: Resu
         style={{ height: 0.5, marginHorizontal: 14, backgroundColor: withOpacity(theme.colors.mist, 0.5) }}
       />
       <Pressable
-        onPress={() => router.push(`/match/${earlier.matchId}`)}
+        onPress={() => {
+          hapticCardTap();
+          router.push(`/match/${earlier.matchId}`);
+        }}
         accessibilityRole="button"
         accessibilityLabel={`Earlier this season, ${homeGoals}-${awayGoals}. Open that match.`}
         style={({ pressed }) => ({

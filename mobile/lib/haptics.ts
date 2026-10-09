@@ -124,7 +124,7 @@ const FEELS = {
    * `Clock_Tick` is what an Android time picker uses while scrubbing.
    */
   selection: {
-    purpose: 'Moving through a set — a swatch, a club, a tile',
+    purpose: 'Moving through a set, and opening a card',
     ios: { kind: 'selection' },
     android: [{ constant: A.Clock_Tick }],
   },
@@ -402,6 +402,31 @@ export function hapticToggleOn(): void {
 /** @see FEELS.toggleOff */
 export function hapticToggleOff(): void {
   play('toggleOff');
+}
+
+/**
+ * A card or list row was tapped to open it.
+ *
+ * ⭐⭐ ONE LINE CONTROLS EVERY CARD IN THE APP. Twenty press sites across
+ * eighteen card components call this and nothing else, so retuning card taps —
+ * or removing them — is a change here rather than twenty edits. That is the
+ * whole reason it is a named dispatcher instead of twenty inline
+ * `hapticSelection()` calls.
+ *
+ * ⚠⚠ DELIBERATELY THE FAINTEST FEEL WE HAVE, and it is still a judgement call
+ * against both platforms. Neither iOS nor Android buzzes on list navigation:
+ * tapping a row in Settings, Mail, the App Store, Gmail or the Play Store does
+ * nothing, because the screen transition IS the feedback. Ryan asked for it
+ * anyway, knowing that, and chose the lighter tick over the firmer press — so
+ * `selection` rather than `press`, which keeps the firm one meaning "a control
+ * did something" rather than "you went somewhere".
+ *
+ * ⚠ The nav bar already presses, so an ordinary browse — tab, card, inner tab,
+ * row, back, card — is five buzzes in about eight seconds. If that reads as
+ * ambient rather than responsive, this function is the switch.
+ */
+export function hapticCardTap(): void {
+  play('selection');
 }
 
 /** Convenience for a switch: the direction picks the feel. @see FEELS.toggleOn */

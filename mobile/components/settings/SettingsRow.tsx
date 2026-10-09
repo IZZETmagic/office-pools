@@ -8,6 +8,7 @@
 import { Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon } from '@/components/ui';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 export function SettingsRow({
@@ -33,7 +34,10 @@ export function SettingsRow({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

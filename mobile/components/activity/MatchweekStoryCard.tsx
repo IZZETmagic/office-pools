@@ -9,6 +9,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon } from '@/components/ui';
 import type { ActivityItem, MatchweekStoryMeta } from '@/lib/useActivity';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { relativeTime } from './ActivityCard';
@@ -53,7 +54,11 @@ export function MatchweekStoryCard({
 
   return (
     <Pressable
-      onPress={hasDetail ? () => setOpen((o) => !o) : (onOpen ?? undefined)}
+      onPress={() => {
+        hapticCardTap();
+        if (hasDetail) setOpen((o) => !o);
+        else onOpen?.();
+      }}
       accessibilityRole="button"
       accessibilityState={hasDetail ? { expanded: open } : undefined}
       style={({ pressed }) => ({
@@ -172,7 +177,10 @@ export function MatchweekStoryCard({
         )}
         {onOpen ? (
           <Pressable
-            onPress={onOpen}
+            onPress={() => {
+              hapticCardTap();
+              onOpen();
+            }}
             hitSlop={10}
             accessibilityRole="link"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}

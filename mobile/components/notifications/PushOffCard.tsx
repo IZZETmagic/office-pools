@@ -7,6 +7,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon } from '@/components/ui';
 import type { PushAskMode } from '@/lib/pushAsk';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export function PushOffCard({
@@ -71,7 +72,10 @@ export function PushOffCard({
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
         {/* The Needs-you card's own button, so the two read as one system. */}
         <Pressable
-          onPress={onTurnOn}
+          onPress={() => {
+            hapticCardTap();
+            onTurnOn();
+          }}
           hitSlop={6}
           accessibilityRole="button"
           style={({ pressed }) => ({

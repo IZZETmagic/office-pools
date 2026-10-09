@@ -7,6 +7,7 @@ import { Platform, Pressable, Text as RNText, View } from 'react-native';
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus';
 import { displayTeamName } from '@/lib/teamNames';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -236,7 +237,10 @@ export function MatchResultRow({ match, onPress }: Props) {
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

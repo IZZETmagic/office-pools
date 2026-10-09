@@ -4,6 +4,7 @@ import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { AwardBadge, FormDots, LevelPill, rankColor } from './leaderboard-shared';
 import { Icon, Text } from '@/components/ui';
 import type { LeaderboardEntry, PoolAward } from '@/lib/api';
+import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type RowProps = {
@@ -25,7 +26,10 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticCardTap();
+        onPress?.();
+      }}
       disabled={!onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
