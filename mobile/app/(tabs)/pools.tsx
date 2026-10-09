@@ -5,7 +5,6 @@ import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  DEFAULT_FILTERS,
   DiscoverFilters,
   DiscoverList,
   EmptyPools,
@@ -14,22 +13,24 @@ import {
   PoolCreateJoinSheet,
   type PoolCreateJoinSheetHandle,
   PoolListItem,
-  PoolsFilterBar,
   PoolsFilterSheet,
   type PoolsFilterSheetHandle,
   PoolsHeader,
   PoolsSegment,
   type DiscoverModeFilter,
-  type PoolsFilters,
   type PoolsTab,
-  type TypeFilter,
 } from '@/components/pools';
-import { Button, Icon, Text } from '@/components/ui';
-import { isLeaguePoolMode } from '@/lib/design/poolMode';
+import { Button, Icon, Pressable, Text } from '@/components/ui';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import {
+  applyFilters,
+  clearFilters,
+  countActiveFilters,
+  DEFAULT_FILTERS,
+  type PoolsFilters,
+} from '@/lib/poolsFilter';
 import { useManualRefresh } from '@/lib/useManualRefresh';
-import type { PoolSummary } from '@/lib/useHomeData';
-import { useTheme, withOpacity } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export default function PoolsScreen() {
   const theme = useTheme();
@@ -47,10 +48,7 @@ export default function PoolsScreen() {
   const [filters, setFilters] = useState<PoolsFilters>(DEFAULT_FILTERS);
   const [discoverSearch, setDiscoverSearch] = useState('');
   const [discoverMode, setDiscoverMode] = useState<DiscoverModeFilter>('all');
-  // Filter sheet ref — mounted at the screen root (below) so the bottom
-  // sheet positions from the bottom of the device, not from inside the
-  // filter bar's bounds. The bar invokes `onOpenSheet(config)` which we
-  // delegate to `sheetRef.current?.open(config)`.
+  // Sort-and-filter sheet, opened by the button in the header row.
   const filterSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
   // Create/Join sheet ref — opened from the "+" button in PoolsHeader.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
@@ -86,6 +84,7 @@ export default function PoolsScreen() {
   const allPools = data?.allPools ?? [];
 
   const visiblePools = useMemo(() => applyFilters(allPools, filters), [allPools, filters]);
+  const activeFilterCount = countActiveFilters(filters);
 
   const isMyPools = tab === 'my-pools';
   const hasAnyPools = allPools.length > 0;
@@ -132,12 +131,28 @@ export default function PoolsScreen() {
         </View>
       ) : (
         <>
-      <PoolsSegment active={tab} onChange={setTab} />
-      {isMyPools && hasAnyPools ? (
-        <PoolsFilterBar
-          filters={filters}
-          onChange={setFilters}
-          onOpenSheet={(config) => filterSheetRef.current?.open(config)}
+      <PoolsSegment
+        active={tab}
+        onChange={setTab}
+        filter={
+          isMyPools && hasAnyPools
+            ? {
+                activeCount: activeFilterCount,
+                sortChanged: filters.sort !== DEFAULT_FILTERS.sort,
+                onPress: () => filterSheetRef.current?.open(),
+              }
+            : null
+        }
+      />
+      {/* ⚠ THE FILTERS LIVE IN A SHEET NOW, so the list must say when it is
+          narrowed. Without this line a filtered list reads as "all my pools" —
+          most of all when Home's "needs predictions" card lands here with
+          `?filter=pending` already applied. */}
+      {isMyPools && hasAnyPools && activeFilterCount > 0 ? (
+        <FilteredSummary
+          shown={visiblePools.length}
+          total={allPools.length}
+          onClear={() => setFilters(clearFilters(filters))}
         />
       ) : null}
       {!isMyPools ? (
@@ -171,7 +186,7 @@ export default function PoolsScreen() {
           !hasAnyPools ? (
             <EmptyPools onJoinPress={() => joinPoolSheetRef.current?.open()} />
           ) : visiblePools.length === 0 ? (
-            <NoFilterMatch onClear={() => setFilters(DEFAULT_FILTERS)} />
+            <NoFilterMatch onClear={() => setFilters(clearFilters(filters))} />
           ) : (
             visiblePools.map((pool) => (
               <PoolListItem
@@ -188,12 +203,15 @@ export default function PoolsScreen() {
         </>
       )}
 
-      {/* Filter picker sheet — mounted as a sibling of the ScrollView at
-          the screen root so the @gorhom/bottom-sheet positions itself
-          from the BOTTOM OF THE DEVICE rather than from inside the
-          filter bar's bounds. PoolsFilterBar invokes onOpenSheet(config)
-          when a chip / sort button is tapped. */}
-      <PoolsFilterSheet ref={filterSheetRef} />
+      {/* Sort-and-filter sheet. It opens in its own Modal so it rises over
+          the tab bar; every tap writes straight to `filters`, so the list
+          behind it is live. */}
+      <PoolsFilterSheet
+        ref={filterSheetRef}
+        pools={allPools}
+        filters={filters}
+        onChange={setFilters}
+      />
 
       {/* Create/Join action sheet — opened by tapping the "+" in
           PoolsHeader. Picking "Join with Code" closes this sheet and
@@ -208,65 +226,6 @@ export default function PoolsScreen() {
       <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
   );
-}
-
-const LEAGUE_TYPE_VALUES = new Set(['pickem', 'showdown', 'last_man_standing', 'table']);
-
-function matchesType(pool: PoolSummary, type: TypeFilter): boolean {
-  if (LEAGUE_TYPE_VALUES.has(type)) {
-    if (!isLeaguePoolMode(pool.predictionMode)) return false;
-    return (pool.leagueMode ?? 'pickem') === type;
-  }
-  return pool.predictionMode === type;
-}
-
-function applyFilters(pools: PoolSummary[], filters: PoolsFilters): PoolSummary[] {
-  const next = pools.filter((p) => {
-    if (filters.status !== 'all' && p.status !== filters.status) return false;
-    // ⚠ THE TYPE FILTER SPANS TWO COLUMNS. The three bracket values live in
-    // `predictionMode`; the four league games live in `leagueMode`, because all
-    // four share `predictionMode === 'league_pickem'`. Matching everything
-    // against `predictionMode` — which is what this did — meant no selection
-    // could ever show a league pool, and every selection hid all of them.
-    //
-    // A league pool with a NULL `leagueMode` reads as Pick'em, the same
-    // fallback the card's pill and the web both use (three production pools
-    // carry NULL there and all three are Pick'em).
-    if (filters.type !== 'all' && !matchesType(p, filters.type)) return false;
-    // `needsPredictions` is the canonical "does the user still have to predict
-    // something?" check — for progressive pools it accounts for new open
-    // rounds even when `hasSubmittedPredictions` was flipped true by an
-    // earlier round. Filter on this so the "Pending" pill matches what the
-    // dashboard's predictions-alert card counts.
-    if (filters.predictions === 'pending' && !p.needsPredictions) return false;
-    if (filters.predictions === 'submitted' && p.needsPredictions) return false;
-    return true;
-  });
-
-  next.sort((a, b) => {
-    // Branded pools always lead — sponsorship rule
-    const aBranded = a.brandName ? 0 : 1;
-    const bBranded = b.brandName ? 0 : 1;
-    if (aBranded !== bBranded) return aBranded - bBranded;
-
-    switch (filters.sort) {
-      case 'newest':
-        return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime();
-      case 'name':
-        return a.poolName.localeCompare(b.poolName);
-      case 'points':
-        return b.totalPoints - a.totalPoints;
-      case 'smart':
-      default:
-        if (a.needsPredictions !== b.needsPredictions) {
-          return a.needsPredictions ? -1 : 1;
-        }
-        if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
-        return a.poolName.localeCompare(b.poolName);
-    }
-  });
-
-  return next;
 }
 
 function NoFilterMatch({ onClear }: { onClear: () => void }) {
@@ -302,6 +261,40 @@ function NoFilterMatch({ onClear }: { onClear: () => void }) {
         </Text>
       </View>
       <Button title="Clear Filters" variant="secondary" onPress={onClear} />
+    </View>
+  );
+}
+
+/**
+ * "Showing 2 of 12 pools · Clear" — under the header row whenever a filter is
+ * narrowing the list. Sort alone does not count: it hides nothing.
+ */
+function FilteredSummary({
+  shown,
+  total,
+  onClear,
+}: {
+  shown: number;
+  total: number;
+  onClear: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: theme.spacing.xl,
+        paddingTop: theme.spacing.sm,
+      }}
+    >
+      <Text style={{ fontFamily: fontFamilies.bold, fontSize: 13, color: theme.colors.slate }}>
+        Showing {shown} of {total} {total === 1 ? 'pool' : 'pools'}
+      </Text>
+      <Pressable onPress={onClear} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear filters">
+        <Text style={{ fontFamily: fontFamilies.black, fontSize: 13, color: theme.colors.red }}>Clear</Text>
+      </Pressable>
     </View>
   );
 }

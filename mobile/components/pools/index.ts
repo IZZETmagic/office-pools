@@ -8,16 +8,6 @@ export { EmptyPools } from './EmptyPools';
 export { JoinPoolSheet, type JoinPoolSheetHandle } from './JoinPoolSheet';
 export { PoolCreateJoinSheet, type PoolCreateJoinSheetHandle } from './PoolCreateJoinSheet';
 export { PoolListItem } from './PoolListItem';
-export {
-  PoolsFilterBar,
-  DEFAULT_FILTERS,
-  type PoolsFilters,
-  type TypeFilter,
-} from './PoolsFilterBar';
-export {
-  PoolsFilterSheet,
-  type PoolsFilterSheetHandle,
-  type FilterSheetConfig,
-} from './PoolsFilterSheet';
+export { PoolsFilterSheet, type PoolsFilterSheetHandle } from './PoolsFilterSheet';
 export { PoolsHeader } from './PoolsHeader';
-export { PoolsSegment, type PoolsTab } from './PoolsSegment';
+export { PoolsSegment, type PoolsFilterButtonState, type PoolsTab } from './PoolsSegment';
