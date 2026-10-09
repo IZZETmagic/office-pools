@@ -44,6 +44,7 @@ import {
   View,
 } from 'react-native';
 
+import { hapticPress, hapticWarning } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 const IOS = Platform.OS === 'ios';
@@ -131,6 +132,13 @@ export function PromptDialog({
   }, [visible, defaultValue]);
 
   const confirmTint = destructive ? theme.colors.red : theme.colors.primary;
+
+  /**
+   * ⚠ A PRESS, NOT AN OUTCOME. `onSubmit` hands the typed value to a caller
+   * that then does async work, so success and failure are theirs to report —
+   * see `hapticSuccess`/`hapticFailure`. This only says the tap landed.
+   */
+  const submitFeel = () => (destructive ? hapticWarning() : hapticPress());
   const trimmed = value.trim();
   const canSubmit = trimmed.length > 0 && !busy;
 
@@ -193,7 +201,13 @@ export function PromptDialog({
               autoCorrect={false}
               returnKeyType="done"
               onSubmitEditing={() => {
-                if (canSubmit) onSubmit(trimmed);
+                // ⚠ The keyboard's return key is the OTHER way to submit this
+                // dialog, and it has to feel the same as the button. Missing it
+                // is how one action ends up with two different answers.
+                if (canSubmit) {
+                  submitFeel();
+                  onSubmit(trimmed);
+                }
               }}
               selectTextOnFocus
               style={{
@@ -230,7 +244,10 @@ export function PromptDialog({
                 </RNText>
               </Pressable>
               <Pressable
-                onPress={() => onSubmit(trimmed)}
+                onPress={() => {
+                  submitFeel();
+                  onSubmit(trimmed);
+                }}
                 disabled={!canSubmit}
                 style={({ pressed }) => ({
                   flex: 1,

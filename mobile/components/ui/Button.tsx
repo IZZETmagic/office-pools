@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { Text } from './Text';
+import { playFeel, type FeelName } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -20,6 +21,21 @@ type ButtonProps = Omit<PressableProps, 'style' | 'children'> & {
   loading?: boolean;
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Opt in to a haptic on press, naming a feel from `lib/haptics.ts`.
+   *
+   * ⚠⚠ OPT-IN, AND IT MUST STAY THAT WAY. There are 429 `onPress` handlers
+   * across 132 files in this app. A default here would buzz most of them, and a
+   * buzz that happens everywhere stops meaning "that registered" and becomes
+   * ambient — which is how an app starts feeling cheap. This prop exists so
+   * adding a haptic to a button is one word instead of a wrapper, NOT so that
+   * every button gets one.
+   *
+   * ⭐ Firing on press rather than on the action's outcome is deliberate: the
+   * outcome belongs to whoever awaited it, and `hapticSuccess`/`hapticFailure`
+   * are theirs to call. This one only says "I felt your finger".
+   */
+  haptic?: FeelName;
 };
 
 export function Button({
@@ -30,6 +46,8 @@ export function Button({
   fullWidth = false,
   disabled,
   style,
+  haptic,
+  onPress,
   ...rest
 }: ButtonProps) {
   const theme = useTheme();
@@ -60,6 +78,12 @@ export function Button({
   return (
     <Pressable
       {...rest}
+      // `onPress` is pulled out of `rest` so it can be wrapped. Pressable does
+      // not fire it while disabled, so `loading` needs no guard of its own.
+      onPress={(ev) => {
+        if (haptic) playFeel(haptic);
+        onPress?.(ev);
+      }}
       disabled={isDisabled}
       style={({ pressed }) => [
         {

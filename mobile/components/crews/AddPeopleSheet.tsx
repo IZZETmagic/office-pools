@@ -25,6 +25,7 @@ import { Icon, Text, useSheetChrome } from '@/components/ui';
 import { inviteToCrew, lookupUsername } from '@/lib/api';
 import { invitePreviewText, personName, type Person } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { CrewFace } from './CrewFace';
@@ -77,6 +78,7 @@ export const AddPeopleSheet = forwardRef<
     try {
       if (looksLikeEmail(q)) {
         await inviteToCrew(crewId, { email: q });
+        hapticSuccess();
         // ⚠ The same answer whether or not the address has an account — never reveal who's on SportPool.
         setNote({ tone: 'ok', text: `Invite sent to ${q.toLowerCase()}. They’ll tap Join once to be in.` });
         setQuery('');
@@ -89,6 +91,10 @@ export const AddPeopleSheet = forwardRef<
         else if (found.length > 1) setNote({ tone: 'ok', text: `${found.length} people have that username — which one?` });
       }
     } catch (e) {
+      // ⚠ ONLY THE THROW. "Nobody has that exact username" is a lookup that
+      // worked and found nothing — a dead end, not a failure, and buzzing it
+      // would tell someone their typo broke something.
+      hapticFailure();
       setNote({ tone: 'bad', text: e instanceof Error ? e.message : 'That didn’t work. Please try again.' });
     } finally {
       setSearching(false);
@@ -99,9 +105,11 @@ export const AddPeopleSheet = forwardRef<
     setRows((r) => ({ ...r, [p.userId]: { kind: 'busy' } }));
     try {
       await inviteToCrew(crewId, { userId: p.userId });
+      hapticSuccess();
       setRows((r) => ({ ...r, [p.userId]: { kind: 'added' } }));
       onChanged();
     } catch (e) {
+      hapticFailure();
       setRows((r) => ({ ...r, [p.userId]: { kind: 'error', message: e instanceof Error ? e.message : 'Couldn’t add them.' } }));
     }
   }

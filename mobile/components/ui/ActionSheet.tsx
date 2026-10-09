@@ -38,6 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from './Icon';
 import { Text } from './Text';
 import { SHEET_RADIUS } from './sheetChrome';
+import { hapticSelection, hapticWarning } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type ActionSheetOption<T extends string> = {
@@ -209,6 +210,13 @@ export function ActionSheet<T extends string>({
                 disabled={option.disabled}
                 onPress={() => {
                   if (option.disabled) return;
+                  // ⚠ `selection`, not `press`: this sheet picks a VALUE out of
+                  // a list — a sort order, a competition — which is the same
+                  // act as a swatch in the avatar editor, not the same as
+                  // choosing an action to perform. ActionMenu is the one that
+                  // presses.
+                  if (option.destructive) hapticWarning();
+                  else hapticSelection();
                   onSelect(option.value);
                 }}
                 style={({ pressed }) => ({

@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text, useSheetChrome } from '@/components/ui';
 import { saveCrewFromPool } from '@/lib/api';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 const NAME_MAX = 60; // matches 154's CHECK and lib/crews/rules.CREW_NAME_MAX
@@ -74,9 +75,13 @@ export const SaveCrewSheet = forwardRef<SaveCrewSheetHandle, { onSaved: () => vo
     setError(null);
     try {
       await saveCrewFromPool(poolId, trimmed);
+      // ⚠ Before the close, not after: the sheet is about to animate away and
+      // the buzz belongs to the tap that sent it.
+      hapticSuccess();
       sheetRef.current?.close();
       onSaved();
     } catch (e) {
+      hapticFailure();
       setError(e instanceof Error ? e.message : 'Could not save the crew.');
     } finally {
       setSaving(false);

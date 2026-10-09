@@ -37,6 +37,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { PracticeScoutSheet } from '@/components/onboarding/PracticeScoutSheet';
 import { LeaderboardRow } from '@/components/pool-detail/LeaderboardRow';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
+import { hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { Button, Icon, Text } from '@/components/ui';
 import type { LeaderboardEntry } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -153,7 +154,17 @@ export default function OnboardingFlowScreen() {
       <PracticeScoutSheet fixture={scouting} onClose={() => setScouting(null)} />
       <SimulatedPushAlert
         visible={pushAsking}
-        onAnswer={(granted) => { setPushAsking(false); setPushGranted(granted); setStep('done'); }}
+        // ⚠ Mirrors `app/(onboarding)/notifications.tsx`: a DENIAL is a
+        // legitimate answer, not an error, so it gets the warning rhythm rather
+        // than the failure one. The two screens must agree — this one is a
+        // rehearsal for it.
+        onAnswer={(granted) => {
+          if (granted) hapticSuccess();
+          else hapticWarning();
+          setPushAsking(false);
+          setPushGranted(granted);
+          setStep('done');
+        }}
       />
 
       <HarnessBar step={step} onBack={() => router.back()} onRestart={restart} />
@@ -202,7 +213,7 @@ function Intro({ onNext }: { onNext: () => void }) {
         </View>
       </View>
       <Footer>
-        <Button title="Give me the fixtures" size="lg" fullWidth onPress={onNext} />
+        <Button title="Give me the fixtures" size="lg" fullWidth haptic="press" onPress={onNext} />
         <Text variant="detail" color="slate" align="center">No account. Nothing saved yet.</Text>
       </Footer>
     </>
@@ -278,11 +289,16 @@ function PickStep({
         ))}
       </ScrollView>
       <Footer>
+        {/* ⭐ `success`, not `press`. Ten picks go in and the round is sealed —
+            it is the only commit in the whole flow, and the one beat a first-run
+            should feel differently from the seven taps that got here. The picks
+            themselves already tick: this is the real `OutcomePicker`. */}
         <Button
           title="Lock in my picks"
           size="lg"
           fullWidth
           disabled={remaining > 0}
+          haptic="success"
           onPress={onLock}
         />
         <Text variant="detail" color="slate" align="center">
@@ -382,7 +398,7 @@ function ResultsStep({
           points · exact scorelines would have been worth more
         </Text>
       </ScrollView>
-      <Footer><Button title="Where did I finish?" size="lg" fullWidth onPress={onNext} /></Footer>
+      <Footer><Button title="Where did I finish?" size="lg" fullWidth haptic="press" onPress={onNext} /></Footer>
     </>
   );
 }
@@ -444,7 +460,7 @@ function BoardStep({
         </Text>
       </ScrollView>
       <Footer>
-        <Button title={faced ? 'Next' : 'Next'} size="lg" fullWidth onPress={onNext} />
+        <Button title={faced ? 'Next' : 'Next'} size="lg" fullWidth haptic="press" onPress={onNext} />
       </Footer>
     </>
   );
@@ -497,7 +513,7 @@ function AskStep({ name, onBuild, onSkip }: { name: string; onBuild: () => void;
         </View>
       </View>
       <Footer>
-        <Button title="Make mine" size="lg" fullWidth onPress={onBuild} />
+        <Button title="Make mine" size="lg" fullWidth haptic="press" onPress={onBuild} />
         <Pressable onPress={onSkip} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
           <Text variant="cardTitle" color="slate">Keep my initials</Text>
         </Pressable>
@@ -567,7 +583,7 @@ function TrialStep({ onNext }: { onNext: () => void }) {
         </View>
       </ScrollView>
       <Footer>
-        <Button title="Start the five weeks" size="lg" fullWidth onPress={onNext} />
+        <Button title="Start the five weeks" size="lg" fullWidth haptic="press" onPress={onNext} />
         <Pressable onPress={onNext} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
           <Text variant="cardTitle" color="slate">No thanks</Text>
         </Pressable>
@@ -594,7 +610,7 @@ function AlertsStep({ onAsk, onSkip }: { onAsk: () => void; onSkip: () => void }
       </View>
       <SafeAreaView edges={['bottom']}>
         <View style={{ paddingHorizontal: theme.spacing.xl, paddingBottom: theme.spacing.lg, gap: theme.spacing.sm }}>
-          <Button title="Send me these" size="lg" fullWidth onPress={onAsk} />
+          <Button title="Send me these" size="lg" fullWidth haptic="press" onPress={onAsk} />
           <Pressable onPress={onSkip} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
             <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 16, color: '#FFFFFF99' }}>Not now</RNText>
           </Pressable>
@@ -636,7 +652,7 @@ function DoneStep({ granted, onRestart }: { granted: boolean | null; onRestart: 
           </View>
         ))}
       </ScrollView>
-      <Footer><Button title="Run it again" size="lg" variant="secondary" fullWidth onPress={onRestart} /></Footer>
+      <Footer><Button title="Run it again" size="lg" variant="secondary" fullWidth haptic="press" onPress={onRestart} /></Footer>
     </>
   );
 }

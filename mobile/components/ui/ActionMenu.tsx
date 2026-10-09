@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { hapticPress, hapticWarning } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type ActionMenuItem = {
@@ -116,7 +117,14 @@ export function ActionMenu({
               return (
                 <Pressable
                   key={item.key}
-                  onPress={item.onPress}
+                  // ⚠ `destructive` already tints this red; the feel follows the
+                  // same flag so the warning rhythm and the red arrive
+                  // together. Same precedent as ConfirmDialog.
+                  onPress={() => {
+                    if (item.destructive) hapticWarning();
+                    else hapticPress();
+                    item.onPress();
+                  }}
                   disabled={item.disabled}
                   style={({ pressed }) => ({
                     paddingVertical: 12,

@@ -21,6 +21,7 @@ import { Card, Hint, Notice, Row, Section } from '@/components/crews/bits';
 import { CrewFace } from '@/components/crews/CrewFace';
 import { SettingsHeader } from '@/components/settings';
 import { ConfirmDialog, Icon, PromptDialog } from '@/components/ui';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { ActionSheet, type ActionSheetOption } from '@/components/ui/ActionSheet';
 import {
   disbandCrew,
@@ -87,9 +88,19 @@ export default function CrewScreen() {
     setProblem(null);
     try {
       await fn();
+      // ⭐ ONE FUNNEL, EVERY CREW MUTATION. Rename, co-captain, remove,
+      // disband, restore, rejoin, revoke an invite, link a pool — they all come
+      // through here, so the feel is defined once rather than eight times.
+      //
+      // ⚠ A destructive action buzzes TWICE on purpose: `ConfirmDialog` fires
+      // the warning rhythm as you commit, and this fires success when it
+      // lands. Those are two different facts — "this is irreversible" and "it
+      // is done" — and on a slow connection they are seconds apart.
+      hapticSuccess();
       invalidateCrews(queryClient, id);
       after?.();
     } catch (e) {
+      hapticFailure();
       setProblem(e instanceof Error ? e.message : 'That didn’t work. Please try again.');
     } finally {
       setBusy(false);
