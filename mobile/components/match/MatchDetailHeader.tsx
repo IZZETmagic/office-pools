@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   type StyleProp,
   Text as RNText,
@@ -209,6 +209,11 @@ type Props = {
   timeline?: TimelineEvent[];
   /** Reports the band's full expanded height so each page can pad by it. */
   onExpandedHeight?: (h: number) => void;
+  /**
+   * Reports how far the band folds — `slideBy`, measured — so every page can
+   * keep the fold across a swipe. See `lib/collapsibleTabs.ts`.
+   */
+  onCollapseDistance?: (d: number) => void;
   /** The tab strip. Rides up with the band and ends level with the chrome. */
   children?: React.ReactNode;
 };
@@ -218,6 +223,7 @@ export function MatchDetailHeader({
   scrollY,
   timeline = [],
   onExpandedHeight,
+  onCollapseDistance,
   children,
 }: Props) {
   const theme = useTheme();
@@ -280,6 +286,12 @@ export function MatchDetailHeader({
 
   /** How far the band travels: everything except the strip that stays. */
   const slideBy = Math.max(0, matchupH - COLLAPSED_ROW);
+
+  // ⚠ THE SAME NUMBER THE FOLD RUNS ON, not a second measurement — a page lined
+  // up against any other distance would nudge the band when it arrived.
+  useEffect(() => {
+    onCollapseDistance?.(slideBy);
+  }, [slideBy, onCollapseDistance]);
 
   const slide = useAnimatedStyle(() => {
     if (slideBy === 0) return {};

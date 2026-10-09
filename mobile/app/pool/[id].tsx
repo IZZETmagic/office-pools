@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { CollapsibleTabPage } from '@/components/CollapsibleTabPage';
 import { DossierSheet } from '@/components/scouting/DossierSheet';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,16 +10,10 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   RefreshControl,
-  type RefreshControlProps,
   View,
   useWindowDimensions,
 } from 'react-native';
-import Animated, {
-  type SharedValue,
-  useAnimatedReaction,
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -137,8 +132,8 @@ const MemoMembersTab = memo(MembersTab);
 const MemoFeesTab = memo(FeesTab);
 const MemoSettingsTab = memo(SettingsTab);
 /**
- * ⚠ `TabPage` IS DECLARED AT THE BOTTOM OF THIS FILE and this reference still
- * works, because a function declaration hoists to the top of the module.
+ * One page of the pager — shared with the Match Detail Centre since 2026-10-09,
+ * when the two identical local copies became `CollapsibleTabPage`.
  *
  * ⚠ IT ONLY BITES WHEN ITS `children` ARE STABLE, which is the React Compiler's
  * job (`app.json` → `experiments.reactCompiler`) since `renderTab(key)` builds a
@@ -146,7 +141,7 @@ const MemoSettingsTab = memo(SettingsTab);
  * re-rendering five to eight `Animated.ScrollView`s, and when it doesn't the
  * panels inside are themselves memoised and bail out one level down.
  */
-const MemoTabPage = memo(TabPage);
+const MemoTabPage = memo(CollapsibleTabPage);
 /**
  * ⚠ THE SCOUT SHEET, FOR THE SAME REASON AS THE BAND. It is a gorhom
  * `BottomSheet`, so its open spring and its inner scroll both run on Reanimated,
@@ -202,8 +197,8 @@ export default function PoolDetailScreen() {
    * outside the pager and every tab is its own ScrollView, so no single
    * scroll position existed — which is why the header could not collapse at
    * all before this. Each page writes its own offset in and hands it over
-   * when it becomes the active page (see `TabPage`); a plain shared handler
-   * would leave the header collapsed after swiping to a tab sitting at top.
+   * when it becomes the active page (see `CollapsibleTabPage`), lined up first
+   * so the header keeps its fold across a swipe (2026-10-09).
    *
    * Written from the UI thread, read by an animated style. No re-render.
    */
@@ -217,6 +212,12 @@ export default function PoolDetailScreen() {
    * other mode, where the header is an ordinary sibling above the pager.
    */
   const [bandHeight, setBandHeight] = useState(0);
+  /**
+   * How far the Showdown band folds — measured by the band, reported up, and
+   * handed to every page so a swipe keeps the fold (`lib/collapsibleTabs.ts`).
+   * Read only while the band is on screen; 0 leaves every page as it was.
+   */
+  const [collapseDistance, setCollapseDistance] = useState(0);
   /**
    * Whose scout report is open, if anybody's.
    *
@@ -1151,6 +1152,7 @@ export default function PoolDetailScreen() {
             width={width}
             pageOffset={pageOffset}
             scrollY={scrollY}
+            collapseDistance={isShowdownPool ? collapseDistance : 0}
             paddingTop={bandHeight}
             paddingBottom={theme.spacing.xxxl}
             refreshControl={refreshControl}
@@ -1187,6 +1189,7 @@ export default function PoolDetailScreen() {
           liveNow={duel.liveNow}
           scrollY={scrollY}
           onExpandedHeight={setBandHeight}
+          onCollapseDistance={setCollapseDistance}
         >
           {tabBar}
         </MemoShowdownDuelHeader>
@@ -1281,91 +1284,5 @@ export default function PoolDetailScreen() {
         isAdmin={pool.isAdmin}
       />
     </SafeAreaView>
-  );
-}
-
-/**
- * One page of the horizontal pager: a vertical scroll view that reports its
- * offset to the screen's shared `scrollY`.
- *
- * ⚠ WHY EACH PAGE KEEPS ITS OWN OFFSET TOO.
- *
- * The naive version — one handler on every page writing straight to `scrollY` —
- * looks right until you swipe. Only the visible page emits scroll events, so
- * `scrollY` keeps whatever the PREVIOUS tab left there: swipe from a tab you
- * had scrolled 300pt down to one sitting at the top and the header stays
- * collapsed over a screen that is not scrolled, until you touch it.
- *
- * So each page remembers `mine` and pushes it into the shared value at the
- * moment it BECOMES the active page. `pageOffset` is already a shared value
- * driven by the pager, so the whole exchange happens on the UI thread with no
- * re-render — the same reason the tab pills read it instead of React state.
- *
- * ⚠ The guard inside `onScroll` matters as much as the reaction. A page that is
- * scrolled programmatically while off-screen (a refresh, a keyboard) would
- * otherwise write over the visible page's offset.
- */
-function TabPage({
-  index,
-  width,
-  pageOffset,
-  scrollY,
-  paddingTop,
-  paddingBottom,
-  refreshControl,
-  children,
-}: {
-  index: number;
-  width: number;
-  pageOffset: SharedValue<number>;
-  scrollY: SharedValue<number>;
-  paddingTop: number;
-  paddingBottom: number;
-  refreshControl: React.ReactElement<RefreshControlProps>;
-  children: React.ReactNode;
-}) {
-  const mine = useSharedValue(0);
-
-  const handler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      'worklet';
-      mine.value = e.contentOffset.y;
-      if (Math.round(pageOffset.value) === index) scrollY.value = mine.value;
-    },
-  });
-
-  useAnimatedReaction(
-    () => Math.round(pageOffset.value) === index,
-    (isActive, wasActive) => {
-      'worklet';
-      if (isActive && !wasActive) scrollY.value = mine.value;
-    },
-    [index],
-  );
-
-  // ⚠ MEMOISED, BOTH OF THEM. A fresh style object is a changed prop, and a
-  // changed prop on five to eight mounted ScrollViews is native work on the main
-  // thread — which is the thread the Showdown band's collapse is waiting on. See
-  // the note by the Memo block at the top of this file.
-  const outerStyle = useMemo(() => ({ width }), [width]);
-  const contentStyle = useMemo(
-    () => ({ paddingTop, paddingBottom, flexGrow: 1 }),
-    [paddingTop, paddingBottom],
-  );
-
-  return (
-    <Animated.ScrollView
-      style={outerStyle}
-      contentContainerStyle={contentStyle}
-      onScroll={handler}
-      // ⚠ NOT A THROTTLE. Verified in RN 0.81: `RCTScrollViewComponentView.mm`
-      // maps anything ≤ 16.67ms to 0, and Android's `ReactScrollViewHelper.kt`
-      // only throttles at `>= 17` — so this reads as "every frame" on both.
-      // Left at 16 because that is the documented way to say so.
-      scrollEventThrottle={16}
-      refreshControl={refreshControl}
-    >
-      {children}
-    </Animated.ScrollView>
   );
 }

@@ -8,19 +8,14 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   RefreshControl,
-  type RefreshControlProps,
   Text as RNText,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, {
-  type SharedValue,
-  useAnimatedReaction,
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CollapsibleTabPage } from '@/components/CollapsibleTabPage';
 import { MatchDetailHeader } from '@/components/match/MatchDetailHeader';
 import {
   awayDisplayName,
@@ -204,7 +199,8 @@ export default function MatchDetailScreen() {
    * ⚠ IT LIVES HERE BECAUSE NOTHING ELSE COULD OWN IT. The band sits outside
    * the pager and every tab is its own ScrollView, so no single scroll position
    * exists. Each page writes its own offset in and hands it over when it
-   * becomes the active page — see `TabPage`.
+   * becomes the active page — see `CollapsibleTabPage`, which lines it up
+   * first so the band keeps its fold across a swipe (2026-10-09).
    */
   const scrollY = useSharedValue(0);
   /**
@@ -215,6 +211,11 @@ export default function MatchDetailScreen() {
    * its first screenful sits underneath the header.
    */
   const [bandHeight, setBandHeight] = useState(0);
+  /**
+   * How far the band folds — measured by the band, reported up, and handed to
+   * every page so a swipe keeps the fold (`lib/collapsibleTabs.ts`).
+   */
+  const [collapseDistance, setCollapseDistance] = useState(0);
 
   const pagerRef = useRef<Animated.ScrollView | null>(null);
   // When a tab change comes from a swipe the pager has already settled at the
@@ -415,12 +416,13 @@ export default function MatchDetailScreen() {
         style={{ flex: 1 }}
       >
         {tabs.map((key, i) => (
-          <TabPage
+          <CollapsibleTabPage
             key={key}
             index={i}
             width={width}
             pageOffset={pageOffset}
             scrollY={scrollY}
+            collapseDistance={collapseDistance}
             // ⚠ THE LINE-UPS TAB GETS NO BREATHING ROOM, AND THAT IS THE POINT.
             // Every other tab is a stack of cards, which need the 16pt to sit
             // off the header. The pitch is full-bleed: a gap above it leaves a
@@ -438,7 +440,7 @@ export default function MatchDetailScreen() {
             }
           >
             {renderTab(key, match)}
-          </TabPage>
+          </CollapsibleTabPage>
         ))}
       </Animated.ScrollView>
 
@@ -454,6 +456,7 @@ export default function MatchDetailScreen() {
         scrollY={scrollY}
         timeline={timeline}
         onExpandedHeight={setBandHeight}
+        onCollapseDistance={setCollapseDistance}
       >
         <MatchTabBar active={tab} tabs={tabs} onChange={setTab} pageOffset={pageOffset} />
       </MatchDetailHeader>
@@ -533,81 +536,6 @@ function FallbackShell({ children }: { children: React.ReactNode }) {
         {children}
       </View>
     </View>
-  );
-}
-
-/**
- * One page of the horizontal pager: a vertical scroll view that reports its
- * offset to the screen's shared `scrollY`.
- *
- * ⚠ WHY EACH PAGE KEEPS ITS OWN OFFSET TOO.
- *
- * The naive version — one handler on every page writing straight to `scrollY` —
- * looks right until you swipe. Only the visible page emits scroll events, so
- * `scrollY` keeps whatever the PREVIOUS tab left there: swipe from a tab you
- * had scrolled 300pt down to one sitting at the top and the band stays
- * collapsed over a screen that is not scrolled, until you touch it.
- *
- * So each page remembers `mine` and pushes it into the shared value at the
- * moment it BECOMES the active page. `pageOffset` is already a shared value
- * driven by the pager, so the whole exchange happens on the UI thread with no
- * re-render — the same reason the strip's pills read it instead of React state.
- *
- * ⚠ The guard inside `onScroll` matters as much as the reaction. A page that is
- * scrolled programmatically while off-screen (a refresh, a keyboard) would
- * otherwise write over the visible page's offset.
- *
- * Lifted from `pool/[id].tsx`, where the same three sentences are written out
- * at pool scale.
- */
-function TabPage({
-  index,
-  width,
-  pageOffset,
-  scrollY,
-  paddingTop,
-  paddingBottom,
-  refreshControl,
-  children,
-}: {
-  index: number;
-  width: number;
-  pageOffset: SharedValue<number>;
-  scrollY: SharedValue<number>;
-  paddingTop: number;
-  paddingBottom: number;
-  refreshControl: React.ReactElement<RefreshControlProps>;
-  children: React.ReactNode;
-}) {
-  const mine = useSharedValue(0);
-
-  const handler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      'worklet';
-      mine.value = e.contentOffset.y;
-      if (Math.round(pageOffset.value) === index) scrollY.value = mine.value;
-    },
-  });
-
-  useAnimatedReaction(
-    () => Math.round(pageOffset.value) === index,
-    (isActive, wasActive) => {
-      'worklet';
-      if (isActive && !wasActive) scrollY.value = mine.value;
-    },
-    [index],
-  );
-
-  return (
-    <Animated.ScrollView
-      style={{ width }}
-      contentContainerStyle={{ paddingTop, paddingBottom, flexGrow: 1 }}
-      onScroll={handler}
-      scrollEventThrottle={16}
-      refreshControl={refreshControl}
-    >
-      {children}
-    </Animated.ScrollView>
   );
 }
 

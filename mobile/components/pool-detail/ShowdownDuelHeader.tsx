@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Share, useWindowDimensions, View, type TextStyle } from 'react-native';
 import Animated, {
@@ -340,6 +340,12 @@ type Props = {
    * without it the first screenful of every tab sits underneath the band.
    */
   onExpandedHeight?: (h: number) => void;
+  /**
+   * Reports how far the band folds — `slideBy`, measured — so every page can
+   * keep the fold across a swipe and hold room enough to scroll it. See
+   * `lib/collapsibleTabs.ts`. 0 while the matchup has not been measured.
+   */
+  onCollapseDistance?: (d: number) => void;
 };
 
 export function ShowdownDuelHeader({
@@ -358,6 +364,7 @@ export function ShowdownDuelHeader({
   scrollY,
   children,
   onExpandedHeight,
+  onCollapseDistance,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -461,6 +468,12 @@ export function ShowdownDuelHeader({
    */
   /** How far the band travels: everything except the strip that stays. */
   const slideBy = Math.max(0, matchupH - COLLAPSED_ROW);
+
+  // ⚠ THE SAME NUMBER THE FOLD RUNS ON, not a second measurement — a page lined
+  // up against any other distance would nudge the band when it arrived.
+  useEffect(() => {
+    onCollapseDistance?.(slideBy);
+  }, [slideBy, onCollapseDistance]);
 
   const slide = useAnimatedStyle(() => {
     if (slideBy === 0) return {};
