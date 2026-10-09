@@ -448,6 +448,9 @@ function InnerLayout() {
         {/* DEV-ONLY — the notifications-off popup, card and tile on demand. Declared so it
             renders full-bleed instead of under a header titled from the file path. */}
         <Stack.Screen name="push-ask-harness" options={{ headerShown: false }} />
+        {/* DEV-ONLY — every haptic feel on demand. Declared so it renders full-bleed instead of
+            under a header titled from the file path. */}
+        <Stack.Screen name="haptics-harness" options={{ headerShown: false }} />
         </Stack>
         <SplashOverlay routingSettled={routingSettled} />
       </PendingActionsProvider>

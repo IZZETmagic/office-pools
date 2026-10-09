@@ -85,9 +85,21 @@ type TerminalRung = { constant: AlwaysSafeConstant } | { pattern: Haptics.Notifi
 /** Highest API first; the last entry is reached by every device. */
 type AndroidLadder = readonly [...GatedRung[], TerminalRung];
 
+/**
+ * iOS as DATA, not a thunk — so the dev harness can print what a feel actually
+ * resolves to, and so the guard test compares structures instead of parsing a
+ * call expression. The Android side has always been data; this makes the two
+ * halves symmetrical.
+ */
+type IosSpec =
+  | { kind: 'selection' }
+  | { kind: 'impact'; style: Haptics.ImpactFeedbackStyle }
+  | { kind: 'notify'; type: Haptics.NotificationFeedbackType };
+
 type Feel = {
-  /** iOS goes straight to the generator UIKit provides for the intent. */
-  ios: () => Promise<void>;
+  /** One line, shown in `app/haptics-harness.tsx`. */
+  purpose: string;
+  ios: IosSpec;
   android: AndroidLadder;
 };
 
@@ -112,7 +124,8 @@ const FEELS = {
    * `Clock_Tick` is what an Android time picker uses while scrubbing.
    */
   selection: {
-    ios: () => Haptics.selectionAsync(),
+    purpose: 'Moving through a set — a swatch, a club, a tile',
+    ios: { kind: 'selection' },
     android: [{ constant: A.Clock_Tick }],
   },
 
@@ -126,7 +139,8 @@ const FEELS = {
    * louder version of it, which is what makes the two tellable apart.
    */
   press: {
-    ios: () => Haptics.impactAsync(IMPACT.Rigid),
+    purpose: 'A discrete control — a tab, a matchweek arrow',
+    ios: { kind: 'impact', style: IMPACT.Rigid },
     android: [{ constant: A.Context_Click }],
   },
 
@@ -144,7 +158,8 @@ const FEELS = {
    * made this identical to `longPress` below on every device under 34.
    */
   dragStart: {
-    ios: () => Haptics.impactAsync(IMPACT.Light),
+    purpose: 'A row was picked up to be dragged',
+    ios: { kind: 'impact', style: IMPACT.Light },
     android: [
       { minApi: 34, constant: A.Drag_Start },
       { minApi: 30, constant: A.Gesture_Start },
@@ -161,19 +176,22 @@ const FEELS = {
    * gesture on the same message — feels identical.
    */
   longPress: {
-    ios: () => Haptics.impactAsync(IMPACT.Medium),
+    purpose: 'A hold opened something — a reaction picker',
+    ios: { kind: 'impact', style: IMPACT.Medium },
     android: [{ constant: A.Long_Press }],
   },
 
   /** A commit landed — the thing you pressed Done on is saved. */
   success: {
-    ios: () => Haptics.notificationAsync(NOTIFY.Success),
+    purpose: 'A commit landed — Done saved',
+    ios: { kind: 'notify', type: NOTIFY.Success },
     android: [{ minApi: 30, constant: A.Confirm }, { pattern: NOTIFY.Success }],
   },
 
   /** A commit was refused or failed. */
   failure: {
-    ios: () => Haptics.notificationAsync(NOTIFY.Error),
+    purpose: 'A commit was refused or failed',
+    ios: { kind: 'notify', type: NOTIFY.Error },
     android: [{ minApi: 30, constant: A.Reject }, { pattern: NOTIFY.Error }],
   },
 
@@ -186,7 +204,8 @@ const FEELS = {
    * 30+ but it means "that failed", not "are you sure" — which is `failure`.
    */
   warning: {
-    ios: () => Haptics.notificationAsync(NOTIFY.Warning),
+    purpose: 'About to destroy something, or you just undid it',
+    ios: { kind: 'notify', type: NOTIFY.Warning },
     android: [{ pattern: NOTIFY.Warning }],
   },
 } as const satisfies Record<string, Feel>;
@@ -205,12 +224,23 @@ export function resolveAndroidRung(ladder: AndroidLadder, api: number): GatedRun
   return ladder[ladder.length - 1] as TerminalRung;
 }
 
+function playIos(spec: IosSpec): Promise<void> {
+  switch (spec.kind) {
+    case 'selection':
+      return Haptics.selectionAsync();
+    case 'impact':
+      return Haptics.impactAsync(spec.style);
+    case 'notify':
+      return Haptics.notificationAsync(spec.type);
+  }
+}
+
 function play(name: FeelName): void {
   const feel: Feel = FEELS[name];
   try {
     const run =
       Platform.OS === 'ios'
-        ? feel.ios()
+        ? playIos(feel.ios)
         : (() => {
             const rung = resolveAndroidRung(feel.android, ANDROID_API);
             return 'pattern' in rung
@@ -261,6 +291,51 @@ export function hapticFailure(): void {
 /** @see FEELS.warning */
 export function hapticWarning(): void {
   play('warning');
+}
+
+// -------------------------------------------------------------
+// Introspection — `app/haptics-harness.tsx` and the guard test
+// -------------------------------------------------------------
+// ⭐ The harness must print what a feel ACTUALLY resolves to on the device in
+// your hand, not what the table hopes for. On Android that depends on the API
+// level, so two phones show two different answers for `dragStart` — and when a
+// pair feels identical, this is what tells you whether that is a design problem
+// or a platform floor.
+
+/** The API level on Android; 0 on iOS. Shown in the harness header. */
+export const androidApiLevel = ANDROID_API;
+
+/** Table order, which is weakest-to-strongest rather than alphabetical. */
+export const FEEL_NAMES = Object.keys(FEELS) as FeelName[];
+
+/** What this feel is for, and the exact call it makes on THIS device. */
+export function describeFeel(name: FeelName): { purpose: string; call: string } {
+  const feel: Feel = FEELS[name];
+  if (Platform.OS === 'ios') {
+    const spec = feel.ios;
+    return {
+      purpose: feel.purpose,
+      call:
+        spec.kind === 'selection'
+          ? 'selectionAsync()'
+          : spec.kind === 'impact'
+            ? `impactAsync(${spec.style})`
+            : `notificationAsync(${spec.type})`,
+    };
+  }
+  const rung = resolveAndroidRung(feel.android, ANDROID_API);
+  return {
+    purpose: feel.purpose,
+    call:
+      'pattern' in rung
+        ? `notificationAsync(${rung.pattern})`
+        : `performAndroidHaptics(${rung.constant})`,
+  };
+}
+
+/** Fire a feel by name — the harness needs this; call sites use the named fns. */
+export function playFeel(name: FeelName): void {
+  play(name);
 }
 
 /** Exported for the guard test only — not a call site API. */

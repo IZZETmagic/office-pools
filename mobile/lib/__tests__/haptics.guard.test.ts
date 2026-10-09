@@ -82,8 +82,15 @@ function parseFeels(): Parsed[] {
   return starts.map(({ name, at }, i) => {
     const chunk = body.slice(at, i + 1 < starts.length ? starts[i + 1].at : undefined);
 
-    const ios = /ios: \(\) =>\s*([^,\n]+)/.exec(chunk);
-    expect(ios, `feel \`${name}\` has no parsable \`ios:\` call`).not.toBeNull();
+    // `ios:` is a STRUCTURED SPEC, not a thunk — `{ kind: 'impact', style:
+    // IMPACT.Rigid }`. Flattened to one string here purely so two feels can be
+    // compared for equality.
+    const iosSpec = /ios: \{([^}]*)\}/.exec(chunk);
+    expect(iosSpec, `feel \`${name}\` has no parsable \`ios:\` spec`).not.toBeNull();
+    const kind = /kind:\s*'(\w+)'/.exec(iosSpec![1]);
+    const arg = /(?:style|type):\s*\w+\.(\w+)/.exec(iosSpec![1]);
+    expect(kind, `feel \`${name}\`'s ios spec has no \`kind\``).not.toBeNull();
+    const ios: [string] = [arg ? `${kind![1]}:${arg[1]}` : kind![1]];
 
     const android = /android: \[([\s\S]*?)\],?\s*\}/.exec(chunk);
     expect(android, `feel \`${name}\` has no parsable \`android:\` ladder`).not.toBeNull();
@@ -103,7 +110,7 @@ function parseFeels(): Parsed[] {
     }
     expect(rungs.length, `feel \`${name}\` parsed an empty ladder`).toBeGreaterThan(0);
 
-    return { name, ios: ios![1].trim(), android: rungs };
+    return { name, ios: ios[0], android: rungs };
   });
 }
 
