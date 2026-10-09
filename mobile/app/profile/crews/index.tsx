@@ -14,12 +14,12 @@ import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Notice } from '@/components/crews/bits';
+import { CrewStatusChip, Notice } from '@/components/crews/bits';
 import { CrewFaceStack } from '@/components/crews/CrewFace';
 import { SettingsHeader } from '@/components/settings';
 import { Icon, PromptDialog, Pressable } from '@/components/ui';
 import { createCrew } from '@/lib/api';
-import { crewStatusText, crewSummary, leaderText, meText, type CrewCard } from '@/lib/crews';
+import { crewSummary, leaderText, meText, type CrewCard } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { invalidateCrews, useMyCrews } from '@/lib/useCrews';
@@ -146,12 +146,6 @@ function CrewCardRow({ crew }: { crew: CrewCard }) {
   const theme = useTheme();
   const { data: home } = useHomeData();
   const viewerId = home?.appUserId ?? null;
-  const tone =
-    crew.status.kind === 'seat'
-      ? { bg: theme.colors.primaryLight, ink: theme.colors.primary }
-      : crew.status.kind === 'live'
-        ? { bg: theme.colors.greenLight, ink: theme.colors.green }
-        : { bg: theme.colors.mist, ink: theme.colors.slate };
   const leader = leaderText(crew, viewerId);
   const me = meText(crew);
 
@@ -177,23 +171,7 @@ function CrewCardRow({ crew }: { crew: CrewCard }) {
         </View>
         <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
       </View>
-      <View
-        style={{
-          alignSelf: 'flex-start',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          backgroundColor: tone.bg,
-          borderRadius: theme.radii.pill,
-          paddingHorizontal: 10,
-          paddingVertical: 5,
-        }}
-      >
-        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tone.ink }} />
-        <RNText numberOfLines={1} style={{ flexShrink: 1, fontFamily: fontFamilies.bold, fontSize: 12, color: tone.ink }}>
-          {crewStatusText(crew.status)}
-        </RNText>
-      </View>
+      <CrewStatusChip status={crew.status} />
       {leader || me ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: theme.spacing.lg, rowGap: 4 }}>
           {leader ? <Stat icon="trophy.fill" tint={theme.colors.amber} text={leader} /> : null}

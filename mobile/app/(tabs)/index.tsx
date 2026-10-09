@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
@@ -7,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Text } from '@/components/ui';
 import {
   CountdownHero,
+  CrewsSection,
   EmptyHome,
   HomeHeader,
   InviteFriendsBanner,
@@ -24,10 +26,12 @@ import {
   type PoolCreateJoinSheetHandle,
 } from '@/components/pools';
 import { PushAskGate } from '@/components/notifications';
+import { homeCrews } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { homeMatchesFrom } from '@/lib/homeMatches';
 import { pickInviteTarget } from '@/lib/inviteCard';
 import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
+import { crewKeys, useMyCrews } from '@/lib/useCrews';
 import type { PoolSummary } from '@/lib/useHomeData';
 import { closeInviteCard, useClosedInviteCards } from '@/lib/useInviteCard';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
@@ -59,9 +63,15 @@ export default function HomeScreen() {
   // same fixture at the same moment, for the single reason that it wires its
   // pull and its focus to THIS feed (`results.tsx`) — which is how the
   // asymmetry was found.
+  //
+  // Your Crews (2026-10-09) is a THIRD feed, the shared `['crews']` query that
+  // My Crews reads, so it joins both refreshes below rather than repeat that.
+  const queryClient = useQueryClient();
+  const { data: crewCards, refetch: refetchCrews } = useMyCrews();
+  const crews = useMemo(() => homeCrews(crewCards), [crewCards]);
   const refreshAll = useCallback(
-    () => Promise.all([refresh(), refreshMatches()]),
-    [refresh, refreshMatches],
+    () => Promise.all([refresh(), refreshMatches(), refetchCrews()]),
+    [refresh, refreshMatches, refetchCrews],
   );
   // Pull-to-refresh: spinner is bound to user gesture only. Background
   // refreshes (focus, realtime, stale) trigger via `refresh` directly and
@@ -91,7 +101,10 @@ export default function HomeScreen() {
       }
       refreshIfStaleRef.current();
       refreshMatchesIfStaleRef.current();
-    }, []),
+      // The query cache's own 30 s clock answers "stale?"; a remount never
+      // refetches (lib/queryClient.ts), so tab focus has to ask.
+      void queryClient.refetchQueries({ queryKey: crewKeys.mine, stale: true });
+    }, [queryClient]),
   );
 
   const pools = data?.pools ?? [];
@@ -198,6 +211,9 @@ export default function HomeScreen() {
         {inviteTarget && !inviteClosedThisVisit ? (
           <InviteFriendsBanner pool={inviteTarget} onClose={() => closeInvite(inviteTarget.poolId)} />
         ) : null}
+
+        {/* Renders nothing without a crew: saving one is an Activity card. */}
+        <CrewsSection crews={crews} viewerId={data?.appUserId ?? null} />
 
         {homeMatches.upcoming.length > 0 ? (
           <View style={{ gap: theme.spacing.md }}>

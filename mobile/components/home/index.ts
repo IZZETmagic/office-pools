@@ -1,4 +1,5 @@
 export { CountdownHero } from './CountdownHero';
+export { CrewsSection } from './CrewsSection';
 export { EmptyHome } from './EmptyHome';
 export { HomeHeader } from './HomeHeader';
 export { InviteFriendsBanner } from './InviteFriendsBanner';

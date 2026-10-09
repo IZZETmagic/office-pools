@@ -186,6 +186,35 @@ export function meText(c: Pick<CrewCard, 'me'>): string | null {
   return c.me.position === 1 ? 'You’re top all-time' : `You’re ${ordinal(c.me.position)} all-time`;
 }
 
+// ── Home (Your Crews, 2026-10-09) ───────────────────────────────────────────
+
+/**
+ * The crews Home shows: all of them but a disbanded one. Only its captain still sees that, and only
+ * to restore it, which is My Crews' job and not Home's.
+ */
+export function homeCrews(cards: CrewCard[] | null | undefined): CrewCard[] {
+  return (cards ?? []).filter((c) => c.status.kind !== 'disbanded');
+}
+
+/**
+ * The Home card's footer: who leads all-time, and where you sit. `none` until a season has finished
+ * with ranks. ⚠ Titles, never points — the all-time rule at the top of this file.
+ */
+export type CrewFooter =
+  | { kind: 'none' }
+  | { kind: 'you-lead'; leader: Person; titles: string | null }
+  | { kind: 'leader'; leader: Person; titles: string | null; you: string | null };
+
+export function crewFooter(c: Pick<CrewCard, 'leader' | 'me'>, viewerId: string | null): CrewFooter {
+  if (!c.leader) return { kind: 'none' };
+  const titles = c.leader.titles > 0 ? plural(c.leader.titles, 'title') : null;
+  if (c.leader.userId === viewerId) return { kind: 'you-lead', leader: c.leader, titles };
+  return { kind: 'leader', leader: c.leader, titles, you: c.me.position === null ? null : ordinal(c.me.position) };
+}
+
+/** What the footer says before any season has finished. */
+export const CREW_FOOTER_EMPTY = 'Titles start when a season finishes';
+
 /** "3rd of 12", or "Played" when the mode has no rank (Last Man Standing). */
 export function finishText(rank: number | null, players: number): string {
   if (rank === null) return 'Played';

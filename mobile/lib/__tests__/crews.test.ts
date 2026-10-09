@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  crewFooter,
   crewsTeaser,
   crewStatusText,
   crewSummary,
   finishText,
+  homeCrews,
   leaderText,
   leaveConsequence,
   meText,
@@ -12,6 +14,7 @@ import {
   personName,
   roleLabel,
   winnersText,
+  type CrewCard,
   type CrewDetail,
 } from '../crews';
 
@@ -62,6 +65,57 @@ describe('the My Crews card', () => {
     expect(crewsTeaser(null)).toBe('The people you keep playing with');
     expect(crewsTeaser([{ name: 'Bermuda Office' }])).toBe('Bermuda Office');
     expect(crewsTeaser([{ name: 'Bermuda Office' }, { name: 'A' }, { name: 'B' }])).toBe('Bermuda Office and 2 more');
+  });
+});
+
+describe('the Home card', () => {
+  const person = { username: null, avatarUrl: null, avatarBuild: null, avatarColour: null };
+  const card = (kind: 'seat' | 'live' | 'quiet' | 'disbanded', crewId: string) =>
+    ({
+      crewId,
+      name: crewId,
+      people: 3,
+      seasons: 1,
+      since: '2026-10-03T12:00:00Z',
+      status:
+        kind === 'disbanded'
+          ? { kind, at: 'x' }
+          : kind === 'quiet'
+            ? { kind, poolId: null, competition: null }
+            : kind === 'seat'
+              ? { kind, poolId: 'p', competition: 'c', firstLockAt: 'x' }
+              : { kind, poolId: 'p', competition: 'c' },
+      leader: null,
+      me: { position: null, titles: 0, seasons: 0 },
+      faces: [],
+    }) as CrewCard;
+
+  it('leaves out a disbanded crew, and keeps the server’s order', () => {
+    expect(homeCrews([card('seat', 'a'), card('disbanded', 'b'), card('quiet', 'c')]).map((c) => c.crewId)).toEqual(['a', 'c']);
+    expect(homeCrews(null)).toEqual([]);
+    expect(homeCrews([card('disbanded', 'b')])).toEqual([]);
+  });
+
+  it('footer: nobody leads until a season has finished with ranks', () => {
+    expect(crewFooter({ leader: null, me: { position: null, titles: 0, seasons: 0 } }, 'me')).toEqual({ kind: 'none' });
+  });
+
+  it('footer: someone else leads — their titles, and my place', () => {
+    const dave = { ...person, userId: 'd', fullName: 'Dave Okafor', titles: 2 };
+    expect(crewFooter({ leader: dave, me: { position: 3, titles: 0, seasons: 2 } }, 'me')).toEqual({
+      kind: 'leader', leader: dave, titles: '2 titles', you: '3rd',
+    });
+    // No ranked finish of my own yet (Last Man Standing only, say): no place, never "—th".
+    expect(crewFooter({ leader: { ...dave, titles: 1 }, me: { position: null, titles: 0, seasons: 1 } }, 'me')).toMatchObject({
+      titles: '1 title', you: null,
+    });
+    // A leader on zero titles says nothing about titles rather than "0 titles".
+    expect(crewFooter({ leader: { ...dave, titles: 0 }, me: { position: 2, titles: 0, seasons: 1 } }, 'me')).toMatchObject({ titles: null });
+  });
+
+  it('footer: I lead', () => {
+    const me = { ...person, userId: 'me', fullName: 'Ryan Sousa', titles: 1 };
+    expect(crewFooter({ leader: me, me: { position: 1, titles: 1, seasons: 1 } }, 'me')).toEqual({ kind: 'you-lead', leader: me, titles: '1 title' });
   });
 });
 
