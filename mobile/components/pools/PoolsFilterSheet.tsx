@@ -66,10 +66,15 @@ import { LEAGUE_MODES as LEAGUE_MODE_OPTIONS, WC_MODES } from '@/lib/createPool'
 import { getCompetitionColor, getPoolStripe } from '@/lib/design/competition';
 import { withLightness } from '@/lib/design/oklch';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
+import { PREDICTION_STYLE_LABEL } from '@/lib/discoverCard';
 import {
+  countDiscoverFilters,
   DEFAULT_DISCOVER_FILTERS,
   type DiscoverFilters,
   type DiscoverSort,
+  type SizeFilter,
+  type StartsFilter,
+  type StyleFilter,
 } from '@/lib/discoverFilter';
 import {
   competitionOptions,
@@ -132,11 +137,33 @@ const SORT_OPTIONS: Array<SortOption<SortMode>> = [
   { value: 'points', label: 'Points', icon: 'chart.xyaxis.line', a11y: 'Most points first' },
 ];
 
-// Discover sorts pools you are not in: by who else is, by age, by name.
+// Discover sorts pools you are not in: by who else is, by age, by name, and by
+// how soon the next picks lock — the matchweek's lock, never the season's end.
 const DISCOVER_SORT_OPTIONS: Array<SortOption<DiscoverSort>> = [
   { value: 'popular', label: 'Popular', icon: 'person.2.fill', a11y: 'Most members first' },
   { value: 'newest', label: 'Newest', icon: 'calendar', a11y: 'Newest pools first' },
   { value: 'name', label: 'Name', icon: 'textformat.abc', a11y: 'Name, A to Z' },
+  { value: 'locks', label: 'Locks', icon: 'clock', a11y: 'Next picks locking soonest first' },
+];
+
+const STYLE_OPTIONS: Array<{ value: StyleFilter; label: string }> = [
+  { value: 'all', label: 'Any' },
+  { value: 'results', label: PREDICTION_STYLE_LABEL.results },
+  { value: 'scores', label: PREDICTION_STYLE_LABEL.scores },
+];
+
+// Buckets from `sizeOf` in lib/discoverFilter.ts — change both together.
+const SIZE_OPTIONS: Array<{ value: SizeFilter; label: string }> = [
+  { value: 'all', label: 'Any' },
+  { value: 'small', label: 'Under 10' },
+  { value: 'medium', label: '10–49' },
+  { value: 'large', label: '50+' },
+];
+
+const STARTS_OPTIONS: Array<{ value: StartsFilter; label: string }> = [
+  { value: 'all', label: 'Any' },
+  { value: 'now', label: 'Now' },
+  { value: 'later', label: 'Later' },
 ];
 
 /** The create-pool flow's glyph for each game, so a game looks the same in both places. */
@@ -180,7 +207,8 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle, PoolsFilterSh
 );
 
 /**
- * Discover: Competition, Type, Sort.
+ * Discover: Competition, Type, Prediction style, Players, Starts, Sort — what
+ * card A shows, as things to narrow by (Ryan, 2026-10-09).
  *
  * ⚠ NO STATUS OR PICKS — every pool here is open and not yours yet, so both
  * would read the same on every row. See lib/discoverFilter.ts.
@@ -188,13 +216,32 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle, PoolsFilterSh
 export const DiscoverFilterSheet = forwardRef<PoolsFilterSheetHandle, DiscoverFilterSheetProps>(
   function DiscoverFilterSheet({ pools, filters, onChange }, ref) {
     const canReset =
-      filters.competition !== DEFAULT_DISCOVER_FILTERS.competition ||
-      filters.type !== DEFAULT_DISCOVER_FILTERS.type ||
-      filters.sort !== DEFAULT_DISCOVER_FILTERS.sort;
+      countDiscoverFilters(filters) > 0 || filters.sort !== DEFAULT_DISCOVER_FILTERS.sort;
 
     return (
       <FilterSheetShell ref={ref} canReset={canReset} onReset={() => onChange(DEFAULT_DISCOVER_FILTERS)}>
-        <CompetitionAndTypeRows pools={pools} filters={filters} onChange={onChange} />
+        <CompetitionAndTypeRows pools={pools} filters={filters} onChange={onChange} minOptions={1} />
+        <SegmentedRow
+          stacked
+          label="Prediction style"
+          options={STYLE_OPTIONS}
+          value={filters.style}
+          onChange={(style) => onChange({ ...filters, style })}
+        />
+        <SegmentedRow
+          stacked
+          label="Players"
+          options={SIZE_OPTIONS}
+          value={filters.size}
+          onChange={(size) => onChange({ ...filters, size })}
+        />
+        <SegmentedRow
+          stacked
+          label="Starts"
+          options={STARTS_OPTIONS}
+          value={filters.starts}
+          onChange={(starts) => onChange({ ...filters, starts })}
+        />
         <SortRow
           options={DISCOVER_SORT_OPTIONS}
           value={filters.sort}
@@ -331,15 +378,18 @@ function CompetitionAndTypeRows<F extends CompetitionAndType>({
   pools,
   filters,
   onChange,
+  minOptions = 2,
 }: {
   pools: PoolIdentity[];
   filters: F;
   onChange: (next: F) => void;
+  /** 2 on My Pools; 1 on Discover, where the row also says what is on offer. */
+  minOptions?: number;
 }) {
   const theme = useTheme();
   const competitions = useMemo(() => competitionOptions(pools), [pools]);
-  const showCompetitions = useMemo(() => showsCompetitionRow(pools), [pools]);
-  const showTypes = useMemo(() => showsTypeRow(pools), [pools]);
+  const showCompetitions = useMemo(() => showsCompetitionRow(pools, minOptions), [pools, minOptions]);
+  const showTypes = useMemo(() => showsTypeRow(pools, minOptions), [pools, minOptions]);
   const types = typeOptions(pools, filters);
 
   return (
@@ -467,12 +517,51 @@ function SectionLabel({ label, style }: { label: string; style?: StyleProp<TextS
 }
 
 /**
- * A label and a three-way segmented control on one row.
+ * A label and a segmented control — beside it on My Pools, above it on
+ * Discover, whose options ("Predict the score", "Under 10") need the row's
+ * full width.
  *
  * The thumb is THUMB_RADIUS inside a CONTROL_RADIUS track — concentric, see
  * ./controlShape.
  */
 function SegmentedRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  stacked = false,
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (next: T) => void;
+  stacked?: boolean;
+}) {
+  const theme = useTheme();
+  const track = <SegmentedTrack label={label} options={options} value={value} onChange={onChange} />;
+  if (stacked) {
+    return (
+      <Section label={label}>
+        <View style={{ paddingHorizontal: theme.spacing.xl }}>{track}</View>
+      </Section>
+    );
+  }
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        paddingHorizontal: theme.spacing.xl,
+      }}
+    >
+      <SectionLabel label={label} style={{ width: 62 }} />
+      <View style={{ flex: 1 }}>{track}</View>
+    </View>
+  );
+}
+
+function SegmentedTrack<T extends string>({
   label,
   options,
   value,
@@ -488,62 +577,51 @@ function SegmentedRow<T extends string>({
   const thumb = theme.mode === 'dark' ? theme.colors.silver : theme.colors.surface;
   return (
     <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel={label}
       style={{
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        paddingHorizontal: theme.spacing.xl,
+        height: CONTROL_HEIGHT,
+        padding: TRACK_INSET,
+        borderRadius: CONTROL_RADIUS,
+        borderCurve: 'continuous',
+        backgroundColor: theme.colors.mist,
       }}
     >
-      <SectionLabel label={label} style={{ width: 62 }} />
-      <View
-        accessibilityRole="radiogroup"
-        accessibilityLabel={label}
-        style={{
-          flex: 1,
-          flexDirection: 'row',
-          height: CONTROL_HEIGHT,
-          padding: TRACK_INSET,
-          borderRadius: CONTROL_RADIUS,
-          borderCurve: 'continuous',
-          backgroundColor: theme.colors.mist,
-        }}
-      >
-        {options.map((o) => {
-          const selected = o.value === value;
-          return (
-            <Pressable
-              key={o.value}
-              haptic="selection"
-              onPress={() => onChange(o.value)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              style={({ pressed }) => ({
-                flex: 1,
-                height: THUMB_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: THUMB_RADIUS,
-                borderCurve: 'continuous',
-                backgroundColor: selected ? thumb : 'transparent',
-                opacity: pressed ? 0.7 : 1,
-                ...(selected ? theme.shadows.card : null),
-              })}
+      {options.map((o) => {
+        const selected = o.value === value;
+        return (
+          <Pressable
+            key={o.value}
+            haptic="selection"
+            onPress={() => onChange(o.value)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            style={({ pressed }) => ({
+              flex: 1,
+              height: THUMB_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: THUMB_RADIUS,
+              borderCurve: 'continuous',
+              backgroundColor: selected ? thumb : 'transparent',
+              opacity: pressed ? 0.7 : 1,
+              ...(selected ? theme.shadows.card : null),
+            })}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: selected ? fontFamilies.black : fontFamilies.bold,
+                fontSize: 13,
+                color: selected ? theme.colors.ink : theme.colors.slate,
+              }}
             >
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontFamily: selected ? fontFamilies.black : fontFamilies.bold,
-                  fontSize: 13,
-                  color: selected ? theme.colors.ink : theme.colors.slate,
-                }}
-              >
-                {o.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

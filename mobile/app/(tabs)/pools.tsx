@@ -102,8 +102,10 @@ export default function PoolsScreen() {
 
   // Discover loads the first time it is shown, then keeps its list.
   const discover = useDiscoverPools({ enabled: !isMyPools });
+  // `now` is read when the list is worked out — "Starts" and the Locks sort
+  // both depend on which matchweek is open at that moment.
   const visibleDiscover = useMemo(
-    () => applyDiscoverFilters(discover.pools, discoverFilters, discoverSearch),
+    () => applyDiscoverFilters(discover.pools, discoverFilters, discoverSearch, new Date()),
     [discover.pools, discoverFilters, discoverSearch],
   );
   const discoverFilterCount = countDiscoverFilters(discoverFilters);

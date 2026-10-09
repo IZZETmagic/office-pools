@@ -229,16 +229,21 @@ export function typeOptions(pools: PoolIdentity[], filters: CompetitionAndType):
 }
 
 /**
- * Whether a row is worth drawing at all: one with a single option cannot
- * narrow anything. Decided over ALL the member's pools, for the same reason as
- * `competitionOptions` — the sheet keeps its shape while it is being used.
+ * Whether a row is worth drawing at all: on My Pools, one with a single option
+ * cannot narrow anything, so it takes two. Decided over ALL the pools, for the
+ * same reason as `competitionOptions` — the sheet keeps its shape while it is
+ * being used.
+ *
+ * ⚠ DISCOVER PASSES 1. There the row is also a statement of what is on offer —
+ * "these are the leagues and games you can join" — which a member scanning
+ * public pools wants to see even when the answer is one (Ryan, 2026-10-09).
  */
-export function showsCompetitionRow(pools: PoolIdentity[]): boolean {
-  return competitionOptions(pools).length >= 2;
+export function showsCompetitionRow(pools: PoolIdentity[], minOptions = 2): boolean {
+  return competitionOptions(pools).length >= minOptions;
 }
 
-export function showsTypeRow(pools: PoolIdentity[]): boolean {
-  return typeOptions(pools, { competition: 'all', type: 'all' }).length >= 2;
+export function showsTypeRow(pools: PoolIdentity[], minOptions = 2): boolean {
+  return typeOptions(pools, { competition: 'all', type: 'all' }).length >= minOptions;
 }
 
 /**

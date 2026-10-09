@@ -3,7 +3,13 @@ import { Text as RNText, View } from 'react-native';
 import { BlockShell, Divider } from './PoolListItem';
 import { CompetitionRail } from '@/components/CompetitionRail';
 import { Icon, Text, Pressable } from '@/components/ui';
-import { discoverCardFacts, formatCountdown, formatSince } from '@/lib/discoverCard';
+import {
+  discoverCardFacts,
+  formatCountdown,
+  formatSince,
+  predictionStyleOf,
+  PREDICTION_STYLE_LABEL,
+} from '@/lib/discoverCard';
 import { withLightness } from '@/lib/design/oklch';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
 import type { DiscoverPool } from '@/lib/useDiscoverPools';
@@ -36,17 +42,6 @@ function brandHex(hex: string | null): string | null {
   return hex.startsWith('#') ? hex : `#${hex}`;
 }
 
-/**
- * "Pick a winner" or "Predict the score" — only for the two games with weekly
- * score picks. ⚠ NULL IS "Predict the score": the picker renders score steppers
- * for anything that is not 'results'.
- */
-function depthLabel(pool: DiscoverPool): string | null {
-  if (pool.leagueMode !== null && pool.leagueMode !== 'pickem' && pool.leagueMode !== 'showdown') return null;
-  if (pool.predictionMode !== 'league_pickem') return null;
-  return pool.leagueDepth === 'results' ? 'Pick a winner' : 'Predict the score';
-}
-
 export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   const theme = useTheme();
   const isDark = theme.mode === 'dark';
@@ -54,7 +49,8 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   const isBranded = Boolean(pool.brandName && brandColor);
   const modeLabel = getModeName(pool.predictionMode, pool.leagueMode);
   const modeChip = getModeChip(pool.predictionMode, pool.leagueMode, isDark);
-  const depth = depthLabel(pool);
+  const style = predictionStyleOf(pool);
+  const depth = style ? PREDICTION_STYLE_LABEL[style] : null;
 
   const now = new Date();
   const facts = discoverCardFacts(pool, pool.seasonClock, now);

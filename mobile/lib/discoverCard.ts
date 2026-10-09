@@ -113,6 +113,31 @@ export function formatCountdown(lockAt: string | null, now: Date): { text: strin
   return { text: `${Math.floor(hours / 24)}d`, soon };
 }
 
+/**
+ * How much a pool asks of you each week — only the two games with weekly score
+ * picks have a style; everything else is null.
+ *
+ * ⚠ NULL `league_depth` IS 'scores': the picker draws score steppers for
+ * anything that is not 'results' (three production pools carry NULL, and both
+ * public pools on 2026-10-09 did).
+ */
+export type PredictionStyle = 'results' | 'scores';
+
+export function predictionStyleOf(pool: {
+  predictionMode: string | null;
+  leagueMode: string | null;
+  leagueDepth: string | null;
+}): PredictionStyle | null {
+  if (!isLeaguePoolMode(pool.predictionMode)) return null;
+  if (pool.leagueMode !== null && pool.leagueMode !== 'pickem' && pool.leagueMode !== 'showdown') return null;
+  return pool.leagueDepth === 'results' ? 'results' : 'scores';
+}
+
+export const PREDICTION_STYLE_LABEL: Record<PredictionStyle, string> = {
+  results: 'Pick a winner',
+  scores: 'Predict the score',
+};
+
 /** "26 Aug", in the reader's own calendar. */
 export function formatSince(iso: string): string {
   const d = new Date(iso);
