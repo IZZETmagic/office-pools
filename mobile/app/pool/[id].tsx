@@ -894,6 +894,7 @@ export default function PoolDetailScreen() {
         return (
           <MemoShowdownRoom
             poolId={pool.poolId}
+            standings={duelStandings}
             /* ⚠ ONLY WHILE THE WALKOUT IS STILL OWED. `revealable` is the one
                phase where a duel is visible to the database and not yet to the
                member; every other phase either has no current duel or has one

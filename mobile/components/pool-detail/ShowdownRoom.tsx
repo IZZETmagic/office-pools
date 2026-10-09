@@ -1,13 +1,23 @@
-import { useMemo, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { Card, Icon, Text, Pressable } from '@/components/ui';
+import {
+  AVATAR_GRADIENTS,
+  avatarBackgroundFor,
+  duelColourIndices,
+  getInitials,
+  gradientForUser,
+} from '@/lib/avatarGradient';
 import { duelResult } from '@/lib/duelPoints';
 import { buildSheet, sheetSummary, type SheetFixture } from '@/lib/duelSheet';
 import { fixturesForWeek } from '@/lib/pickemWeek';
 import { toSheetFixtures, useDuel } from '@/lib/useDuel';
 import { useDuelLive, type DuelLive } from '@/lib/useDuelLive';
 import { useLeaguePool } from '@/lib/useLeaguePool';
+import type { Standing } from './ShowdownDuelHeader';
 import { DUEL_SCORE_W, Scoreline, TeamSheetRows } from './TeamSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -41,13 +51,27 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // ## ⚠ AN OPEN WEEK HAS NO RIVALS' PICKS, AND THAT IS NOT AN EMPTY WEEK
 //
 // `/bulk` withholds a matchweek that is still open. So the current week's card
-// lists its duels and its fixtures with nobody's picks beside them, and the
-// screen has to say "not yet" rather than render blanks that read as "nobody
-// picked". Nothing here may reconstruct a pick from another source.
+// lists its duels and its fixtures with a dash where each rival's pick will be,
+// and SAYS so under the sheet — a bare dash reads as "nobody picked". Nothing
+// here may reconstruct a pick from another source.
+//
+// ⚠⚠ "`/bulk` WITHHOLDS IT" WAS FALSE FOR THE POOL ADMIN UNTIL 2026-10-09. The
+// route handed admins every pick, locked or not — a World Cup rule — so Ryan,
+// admin of his own Showdown pool, could expand any duel the night before and
+// read both sheets. The server now gates league admins like everyone else (see
+// `bypassesRevealGate`), and this screen ALSO refuses to draw a rival's pick for
+// a week that has not locked: a second wall, so an older server or a future
+// bypass shows a dash rather than a sheet.
 // =============================================================
 
 type Props = {
   poolId: string;
+  /**
+   * Where each member sits, keyed by entry — the SAME map the Duel tab and the
+   * band read, built once in `pool/[id].tsx` from the leaderboard. The Room only
+   * wants the face from it (`userId`, `avatarColour`, `avatarBuild`).
+   */
+  standings: Map<string, Standing>;
   /**
    * A matchweek whose duel has opened in RLS but whose walkout this member has
    * not watched — withheld from the switcher until they have.
@@ -70,7 +94,7 @@ type Props = {
   unwatchedMatchweek?: number | null;
 };
 
-export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
+export function ShowdownRoom({ poolId, standings, unwatchedMatchweek = null }: Props) {
   const theme = useTheme();
   const league = useLeaguePool(poolId);
   const { duels, names, revealedWeeks: rlsRevealed, pickLabels, bouts } = useDuel(poolId);
@@ -120,6 +144,19 @@ export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
       : revealedWeeks[revealedWeeks.length - 1] ?? null);
 
   const [openDuel, setOpenDuel] = useState<string | null>(null);
+
+  /**
+   * Has the week on screen LOCKED — i.e. may a rival's pick be shown at all?
+   *
+   * ⚠ FROM THE OPEN MATCHWEEK, NOT FROM `lock_at` AND A CLOCK. The open week is
+   * the one being picked, so every week before it has locked by definition, and
+   * the server worked that out against its own clock. `useDuel` gates its picks
+   * fetch on the same reading for the same reason (and calling `Date.now()` in
+   * render is impure). NULL means nothing is open — the season has run out of
+   * weeks to pick — so everything shown has locked.
+   */
+  const openWeek = league.data?.season.openMatchweekNumber ?? null;
+  const picksRevealed = shown !== null && (openWeek === null || shown < openWeek);
 
   const weekDuels = useMemo(
     () => duels.filter((d) => d.matchweek_number === shown),
@@ -191,20 +228,27 @@ export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
         revealed week would land on a matchweek whose duels the viewer is not
         allowed to see — the arrow simply is not there instead.
       */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Step
-          icon="chevron.left"
-          label="Previous matchweek"
-          enabled={canBack}
-          onPress={() => setWeek(revealedWeeks[i - 1])}
-        />
-        <Text variant="cardTitle">Matchweek {shown}</Text>
-        <Step
-          icon="chevron.right"
-          label="Next matchweek"
-          enabled={canForward}
-          onPress={() => setWeek(revealedWeeks[i + 1])}
-        />
+      <View style={{ gap: theme.spacing.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Step
+            icon="chevron.left"
+            label="Previous matchweek"
+            enabled={canBack}
+            onPress={() => setWeek(revealedWeeks[i - 1])}
+          />
+          <Text variant="cardTitle">Matchweek {shown}</Text>
+          <Step
+            icon="chevron.right"
+            label="Next matchweek"
+            enabled={canForward}
+            onPress={() => setWeek(revealedWeeks[i + 1])}
+          />
+        </View>
+        {/* ⚠ THE CARDS LOST THEIR CHEVRON — Ryan, 2026-10-09 — so this line is
+            now the only thing that says a card opens. */}
+        <Text variant="body" color="slate" align="center">
+          Tap on a matchup to see their predictions.
+        </Text>
       </View>
 
       {weekDuels.map((d) => {
@@ -215,6 +259,9 @@ export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
             key={d.duel_id}
             duel={d}
             names={names}
+            standings={standings}
+            ownEntryIds={ownEntryIds}
+            picksRevealed={picksRevealed}
             isYours={aIsYou || bIsYou}
             open={openDuel === d.duel_id}
             onToggle={() => setOpenDuel(openDuel === d.duel_id ? null : d.duel_id)}
@@ -228,14 +275,20 @@ export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
   );
 }
 
-/** The disclosure chevron, and the spacer that balances it. */
-const CHEVRON = 12;
+/**
+ * The face on a matchup card. Smaller than the band's 84, big enough to be a
+ * person rather than a dot.
+ */
+const AVATAR = 44;
 
 // -------------------------------------------------------------- one duel
 
 function DuelRow({
   duel,
   names,
+  standings,
+  ownEntryIds,
+  picksRevealed,
   isYours,
   open,
   onToggle,
@@ -245,6 +298,9 @@ function DuelRow({
 }: {
   duel: ReturnType<typeof useDuel>['duels'][number];
   names: Record<string, string>;
+  standings: Map<string, Standing>;
+  ownEntryIds: Set<string>;
+  picksRevealed: boolean;
   isYours: boolean;
   open: boolean;
   onToggle: () => void;
@@ -253,7 +309,7 @@ function DuelRow({
   live: DuelLive;
 }) {
   const theme = useTheme();
-  const name = (id: string | null) => (id ? names[id] ?? 'Unknown' : 'Bye');
+  const name = (id: string | null) => (id ? names[id] ?? 'Unknown' : 'Nobody');
   const settled = !!duel.settled_at;
   // ⚠ `duelResult` from side A's column, never a literal — a win has been 500
   // since migration 121.
@@ -265,6 +321,26 @@ function DuelRow({
       : aResult === 'lost'
         ? theme.colors.red
         : theme.colors.ink;
+
+  const standingA = standings.get(duel.entry_a) ?? null;
+  const standingB = duel.entry_b ? standings.get(duel.entry_b) ?? null : null;
+
+  /**
+   * Both grounds, resolved AGAINST EACH OTHER — the band's rule, card-sized.
+   *
+   * ⚠ `duelColourIndices`, not each member's own colour. Two teal members would
+   * otherwise meet as one colour facing itself, and on your own duel the card
+   * would disagree with the band pinned above it, which already shifts one side.
+   * Null when either side has no person to resolve (a bye, or an entry the
+   * leaderboard does not list) — then each corner falls back to its own.
+   */
+  const colours =
+    standingA?.userId && standingB?.userId && duel.entry_b
+      ? duelColourIndices(
+          { entryId: duel.entry_a, userId: standingA.userId, chosen: standingA.avatarColour },
+          { entryId: duel.entry_b, userId: standingB.userId, chosen: standingB.avatarColour },
+        )
+      : null;
 
   /**
    * The week's points so far, for a duel that has not settled.
@@ -281,94 +357,207 @@ function DuelRow({
   })();
 
   return (
-    <Card bordered style={isYours ? { borderColor: withOpacity(theme.colors.primary, 0.5) } : null}>
-      <Pressable onPress={onToggle} accessibilityRole="button">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          {/*
-            ⚠ A SPACER THE SIZE OF THE CHEVRON — Ryan, 2026-09-05: centre the
-            dash on the page.
+    <Card
+      bordered
+      padding="lg"
+      style={isYours ? { borderColor: withOpacity(theme.colors.primary, 0.5) } : null}
+    >
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={`${name(duel.entry_a)} against ${name(duel.entry_b)}`}
+        accessibilityHint="Shows their predictions"
+        accessibilityState={{ expanded: open }}
+      >
+        {/*
+          ⚠ AVATAR OVER NAME, THE BAND'S SHAPE — Ryan, 2026-10-09. A name beside
+          its face would split each half with a 44pt circle, and the names were
+          already truncating ("Quantum Quark") with the whole half to themselves.
+          Stacked, each name gets its half and two lines.
 
-            It already sat dead centre of its own `Scoreline`, and the scoreline
-            still landed left of the card's middle, because the chevron is 12pt
-            of real layout on the right with nothing answering it on the left.
-            Both names are `flex: 1`, so they split whatever is left over — and
-            what is left over was 20pt shorter on one side.
+          ⚠ NO CHEVRON, AND SO NO SPACER. The 12pt spacer on the left existed
+          only to answer the chevron on the right (2026-09-05, "centre the dash
+          on the page"). With both gone the two corners are equal `flex: 1`
+          columns and the score sits on the card's centre by construction. The
+          line under the matchweek title says the card opens.
+        */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+          <Corner
+            name={name(duel.entry_a)}
+            standing={standingA}
+            colourIndex={colours?.a ?? null}
+            emphasis={aResult === 'won'}
+          />
 
-            Balancing it in the FLOW rather than positioning the chevron
-            absolutely: an absolute chevron needs the row's height to centre
-            against, and would sit over the end of a long name instead of
-            pushing it. Twenty points of matching inset reads as padding; an
-            off-centre axis reads as a mistake.
-          */}
-          <View style={{ width: CHEVRON }} />
+          {/* Centred on the FACES, not on the column — the band sets its clock
+              the same way, level with the avatars rather than the names. */}
+          <View style={{ height: AVATAR, justifyContent: 'center' }}>
+            {duel.entry_b === null ? (
+              // ⚠ THE SCORELINE'S OWN WIDTH, so a bye sits on the same axis every
+              // other row's dash does.
+              <Text
+                variant="cardTitle"
+                color="slate"
+                align="center"
+                style={{ width: DUEL_SCORE_W, fontFamily: fontFamilies.black }}
+              >
+                bye
+              </Text>
+            ) : (
+              /*
+                ⚠ THE SCORE THE MOMENT THERE IS ONE — Ryan, 2026-09-05. It used
+                to wait for `settled_at`, so a matchweek being played, and a
+                played one not yet settled, both showed "v" while the Duel tab
+                three taps away had the running scoreline on the header.
 
-          <Text
-            variant="cardTitle"
-            numberOfLines={1}
-            style={{ flex: 1, fontFamily: aResult === 'won' ? fontFamilies.black : undefined }}
-          >
-            {name(duel.entry_a)}
-          </Text>
+                ⚠ A SETTLED DUEL STILL READS ITS STORED ACCURACIES, not the live
+                map. That is the engine's own record of the week and it is what
+                `duelResult` was computed from; preferring a recomputed number
+                would let the card and the result disagree after a rescore.
+
+                ⚠ AND "NO ROWS YET" IS NOT "NIL". `readMatchweekPoints` omits an
+                entry with no score rows, so `undefined` means the fixtures have
+                not been scored — which is a `v`, not a 0-0 claiming a week
+                nobody has played.
+              */
+              <Scoreline
+                kind="duel"
+                home={settled ? duel.accuracy_a ?? 0 : running.a}
+                away={settled ? duel.accuracy_b ?? 0 : running.b}
+                tone={settled ? tint : undefined}
+              />
+            )}
+          </View>
 
           {duel.entry_b === null ? (
-            // ⚠ THE SCORELINE'S OWN WIDTH, so a bye sits on the same axis every
-            // other row's dash does. Left to size itself it pulled the two names
-            // inward and broke the column.
-            <Text
-              variant="cardTitle"
-              color="slate"
-              align="center"
-              style={{ width: DUEL_SCORE_W, fontFamily: fontFamilies.black }}
-            >
-              bye
-            </Text>
+            // A bye names itself, as the band's does: "Nobody", on an empty
+            // ground. Not a lock — nothing is being withheld.
+            <Corner name="Nobody" standing={null} colourIndex={null} emphasis={false} empty />
           ) : (
-            /*
-              ⚠ THE SCORE THE MOMENT THERE IS ONE — Ryan, 2026-09-05. It used to
-              wait for `settled_at`, so a matchweek being played, and a played
-              one not yet settled, both showed "v" while the Duel tab three taps
-              away had the running scoreline on the header. Same duel, two
-              answers.
-
-              ⚠ A SETTLED DUEL STILL READS ITS STORED ACCURACIES, not the live
-              map. That is the engine's own record of the week and it is what
-              `duelResult` was computed from; preferring a recomputed number
-              would let the card and the result disagree after a rescore.
-
-              ⚠ AND "NO ROWS YET" IS NOT "NIL". `readMatchweekPoints` omits an
-              entry with no score rows, so `undefined` means the fixtures have
-              not been scored — which is a `v`, not a 0-0 claiming a week nobody
-              has played. One side present is enough: the other genuinely has
-              nothing so far, and 0 is the honest number for it.
-            */
-            <Scoreline
-              kind="duel"
-              home={settled ? duel.accuracy_a ?? 0 : running.a}
-              away={settled ? duel.accuracy_b ?? 0 : running.b}
-              tone={settled ? tint : undefined}
+            <Corner
+              name={name(duel.entry_b)}
+              standing={standingB}
+              colourIndex={colours?.b ?? null}
+              emphasis={aResult === 'lost'}
             />
           )}
-
-          <Text
-            variant="cardTitle"
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              textAlign: 'right',
-              fontFamily: aResult === 'lost' ? fontFamilies.black : undefined,
-            }}
-          >
-            {name(duel.entry_b)}
-          </Text>
-
-          <Icon name={open ? 'chevron.up' : 'chevron.down'} color="slate" size={CHEVRON} />
         </View>
       </Pressable>
 
       {open ? (
-        <Sheets duel={duel} fixtures={fixtures} pickLabels={pickLabels} live={live} names={names} />
+        <Sheets
+          duel={duel}
+          fixtures={fixtures}
+          pickLabels={pickLabels}
+          live={live}
+          names={names}
+          ownEntryIds={ownEntryIds}
+          picksRevealed={picksRevealed}
+          isYours={isYours}
+        />
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * One side of a matchup: the face, then the name under it.
+ *
+ * ⚠ The gradient behind the face is drawn even when a face exists, the same as
+ * the Leaderboard's: a member with no build shows white initials on it, and one
+ * mid-load shows the ground rather than a hole.
+ */
+function Corner({
+  name,
+  standing,
+  colourIndex,
+  emphasis,
+  empty = false,
+}: {
+  name: string;
+  standing: Standing | null;
+  /** This side's colour after `duelColourIndices`, or null to use the member's own. */
+  colourIndex: number | null;
+  /** The winner of a settled duel, set in black weight as before. */
+  emphasis: boolean;
+  /** A bye's missing opponent — no person, no colour. */
+  empty?: boolean;
+}) {
+  const theme = useTheme();
+  const userId = standing?.userId ?? null;
+  const initials = (
+    <Text
+      style={{
+        fontFamily: fontFamilies.black,
+        fontSize: 15,
+        lineHeight: 20,
+        color: userId ? '#FFFFFF' : theme.colors.slate,
+      }}
+    >
+      {empty ? '' : getInitials(name)}
+    </Text>
+  );
+
+  return (
+    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: theme.spacing.sm }}>
+      <View
+        style={{
+          width: AVATAR,
+          height: AVATAR,
+          borderRadius: theme.radii.pill,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: userId ? 'transparent' : theme.colors.mist,
+        }}
+      >
+        {userId ? (
+          <LinearGradient
+            colors={[
+              ...(colourIndex !== null
+                ? AVATAR_GRADIENTS[colourIndex]
+                : gradientForUser(userId, standing?.avatarColour)),
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              // Rounds itself — a parent's `overflow` does not reliably clip an
+              // absolutely-positioned child to a border radius.
+              borderRadius: theme.radii.pill,
+            }}
+          />
+        ) : null}
+        {userId ? (
+          <MemberAvatar
+            userId={userId}
+            avatarBuild={standing?.avatarBuild ?? null}
+            avatarColour={standing?.avatarColour ?? null}
+            size={AVATAR}
+            // ⚠ THE RESOLVED INDEX when there is one — see `colours` in DuelRow.
+            ground={colourIndex !== null ? avatarBackgroundFor(colourIndex) : undefined}
+            fallback={initials}
+          />
+        ) : (
+          initials
+        )}
+      </View>
+
+      {/* Two lines, not one: "Quantum Quark" wraps rather than losing its tail. */}
+      <Text
+        variant="cardTitle"
+        numberOfLines={2}
+        align="center"
+        color={empty ? 'slate' : undefined}
+        style={{ fontFamily: emphasis ? fontFamilies.black : undefined }}
+      >
+        {name}
+      </Text>
+    </View>
   );
 }
 
@@ -389,17 +578,39 @@ function Sheets({
   pickLabels,
   live,
   names,
+  ownEntryIds,
+  picksRevealed,
+  isYours,
 }: {
   duel: ReturnType<typeof useDuel>['duels'][number];
   fixtures: SheetFixture[];
   pickLabels: Map<string, Map<string, string>>;
   live: DuelLive;
   names: Record<string, string>;
+  ownEntryIds: Set<string>;
+  picksRevealed: boolean;
+  isYours: boolean;
 }) {
   const theme = useTheme();
 
-  const a = pickLabels.get(duel.entry_a);
-  const b = duel.entry_b ? pickLabels.get(duel.entry_b) : undefined;
+  /**
+   * One pick, or null for a dash.
+   *
+   * ⚠⚠ A RIVAL'S PICK IS NULL UNTIL THE WEEK LOCKS, whatever the payload holds —
+   * Ryan, 2026-10-09: "no user should be able to see the predictions for that
+   * matchup" before the matchweek starts. The server is the real wall (`/bulk`
+   * through `bypassesRevealGate`); this is the second one, so a payload that
+   * somehow carries an open week still draws a dash.
+   *
+   * ⚠ YOUR OWN STAY. They are yours, and the Duel tab shows them already.
+   */
+  const label = useCallback(
+    (entryId: string, fixtureId: string) =>
+      !picksRevealed && !ownEntryIds.has(entryId)
+        ? null
+        : pickLabels.get(entryId)?.get(fixtureId) ?? null,
+    [picksRevealed, ownEntryIds, pickLabels],
+  );
 
   const rows = useMemo(
     () =>
@@ -408,14 +619,20 @@ function Sheets({
         live: new Map(live.fixtures.map((f) => [f.number, f])),
         mine: live.perFixture.get(duel.entry_a) ?? new Map(),
         theirs: duel.entry_b ? live.perFixture.get(duel.entry_b) ?? new Map() : new Map(),
-        label: (entryId, fixtureId) => pickLabels.get(entryId)?.get(fixtureId) ?? null,
+        label,
         youEntry: duel.entry_a,
         themEntry: duel.entry_b,
       }),
-    [fixtures, live, pickLabels, duel.entry_a, duel.entry_b],
+    [fixtures, live, label, duel.entry_a, duel.entry_b],
   );
 
-  const summary = sheetSummary(rows);
+  /**
+   * ⚠ ONLY ONCE THE WEEK HAS LOCKED. Against a column of dashes `sheetSummary`
+   * counts every row as agreement — it only calls a row different when BOTH
+   * picks are there — and would announce "Identical sheets" over a sheet nobody
+   * can see yet.
+   */
+  const summary = picksRevealed ? sheetSummary(rows) : null;
 
   if (duel.entry_b === null) {
     return (
@@ -425,62 +642,32 @@ function Sheets({
     );
   }
 
-  // ⚠ NO PICKS AT ALL means the matchweek has not locked, not that nobody
-  // picked — `/bulk` withholds an open week. Saying "not yet" is the only
-  // honest reading; blanks would accuse both members of skipping it.
-  if (!a && !b) {
-    return (
-      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
-        Picks open when the matchweek locks — an hour before the first kickoff.
-      </Text>
-    );
-  }
-
   return (
-    <View style={{ marginTop: theme.spacing.md }}>
+    <View style={{ marginTop: theme.spacing.lg }}>
       {/*
-        ⚠ THE SAME SHEET THE DUEL TAB SHOWS — Ryan, 2026-09-05. This used to be
-        a thinner version of it: a chip either side of "ARS v CHE" as one grey
-        string, with no crest, no scoreline and no kickoff. It drifted the
-        moment the Duel tab's row grew, and a member switching between the two
-        tabs is comparing them directly.
+        ⚠ THE SAME SHEET THE DUEL TAB SHOWS — Ryan, 2026-09-05 — and
+        `buildSheet`, not a second derivation: the outcome rule has three
+        shipped bugs behind it and 21 tests holding it.
 
-        ⚠ AND `buildSheet`, NOT A SECOND DERIVATION. The outcome rule — who took
-        a fixture, and the difference between "not started" and "nobody is ahead
-        yet" — has three shipped bugs behind it and 21 tests holding it. A
-        Room-shaped copy would have had none of them.
-
-        ⚠ WHOSE COLUMN IS WHICH: `entry_a` on the left in blue, `entry_b` on the
-        right in red, matching the two names in the header above. Orientation is
-        presentational — the circle method's sides carry no meaning — but the
-        colours must agree with the names or the sheet is unreadable.
+        ⚠ NO NAMES ROW ANY MORE — Ryan, 2026-10-09. It repeated the two names
+        the card already shows, in blue and red; the faces directly above each
+        column now say whose it is. `entry_a` is still the left column and
+        `entry_b` the right, matching the corners.
       */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          gap: theme.spacing.sm,
-          marginBottom: theme.spacing.xs,
-        }}
-      >
-        <Text variant="caption" numberOfLines={1} style={{ color: theme.colors.primary }}>
-          {names[duel.entry_a] ?? 'Unknown'}
-        </Text>
-        <Text
-          variant="caption"
-          numberOfLines={1}
-          style={{ flex: 1, textAlign: 'right', color: theme.colors.red }}
-        >
-          {names[duel.entry_b] ?? 'Unknown'}
-        </Text>
-      </View>
-
       <TeamSheetRows rows={rows} />
 
-      {/* Agreement is dead weight by definition: a fixture both called the same
-          way cannot separate them whatever it finishes. Saying how many is what
-          makes the rest mean something. */}
-      {summary ? (
+      {!picksRevealed ? (
+        // ⚠ SAID, NOT LEFT TO THE DASHES. A dash after lock means "did not
+        // pick"; before lock it means "not yet", and only this line tells them
+        // apart.
+        <Text variant="detail" color="slate" style={{ marginTop: theme.spacing.sm }}>
+          {isYours ? "Your opponent's picks show" : 'Picks show'} when the matchweek locks — an
+          hour before the first kickoff.
+        </Text>
+      ) : summary ? (
+        /* Agreement is dead weight by definition: a fixture both called the same
+           way cannot separate them whatever it finishes. Saying how many is what
+           makes the rest mean something. */
         <Text variant="detail" color="slate" style={{ marginTop: theme.spacing.sm }}>
           {summary}
         </Text>
