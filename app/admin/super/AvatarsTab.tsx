@@ -226,7 +226,9 @@ function SelectorMock({ assets, cfg, set }: {
           the builder inside a container it shares with the preview, so a card of its own would
           have drawn a border inside a border there. */}
       <div className="bg-surface border border-gray-200 dark:border-gray-400 rounded-2xl p-6">
-        <AvatarBuilder assets={assets} cfg={cfg} set={set} />
+        {/* ⚠ 'unfiltered': this is the art gallery, so it shows every asset that exists,
+            gated ones included (migration 183). The lock is in the database, not here. */}
+        <AvatarBuilder assets={assets} access="unfiltered" cfg={cfg} set={set} />
       </div>
     </div>
   )

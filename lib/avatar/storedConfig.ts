@@ -130,3 +130,83 @@ export function toStoredAvatarBuild(cfg: AvatarConfig): StoredAvatarBuild {
   }
   return out as StoredAvatarBuild
 }
+
+// =============================================================
+// Ownership — migration 183
+// =============================================================
+// ⭐ Some assets are GATED: only a member holding a grant may wear one. The database is the lock
+// (a trigger on `users` refuses an unowned gated asset on any write, from any role), so everything
+// below is the VIEW — what a picker offers — and never the thing that decides.
+//
+// ⚠⚠ THE PICKER WAITS FOR THIS, IT DOES NOT GUESS. Without the gated list there is no way to tell a
+// gated key from a free one, so a host that has no `AvatarAccess` yet must not render the gateable
+// grids at all. Treating "unknown" as "nothing is gated" would offer the gift to everyone, and the
+// save would then fail on the lock with a message that explains nothing.
+
+/** The slots an asset can be gated in. Mirrors the CHECK on `avatar_gated_assets.slot` (183). */
+export const GATEABLE_SLOTS = ['hair', 'facialHair', 'glasses', 'earrings', 'garment'] as const
+export type GateableSlot = (typeof GATEABLE_SLOTS)[number]
+
+/** How a member came to own an asset. Mirrors the CHECK on `avatar_asset_grants.source`. */
+export type GrantSource = 'gift' | 'earned' | 'purchase'
+
+/**
+ * ONE request for the whole answer: every gated asset, with the caller's own grant embedded.
+ * ⭐ RLS on `avatar_asset_grants` returns only the caller's rows, so the embed is empty for anything
+ * they do not own — no second query, and no way to see who else owns what.
+ */
+export const GATED_ASSETS_SELECT = 'slot, asset_key, avatar_asset_grants(source)'
+
+/** A row as `GATED_ASSETS_SELECT` returns it. `unknown` fields: it comes off the wire. */
+export type GatedAssetRow = {
+  slot: unknown
+  asset_key: unknown
+  avatar_asset_grants: unknown
+}
+
+/** What this member may wear beyond the free set. Keys are `slot:asset_key`. */
+export type AvatarAccess = {
+  gated: ReadonlySet<string>
+  owned: ReadonlyMap<string, GrantSource>
+}
+
+const accessKey = (slot: string, key: string) => `${slot}:${key}`
+
+const isGrantSource = (v: unknown): v is GrantSource =>
+  v === 'gift' || v === 'earned' || v === 'purchase'
+
+/**
+ * ⚠ TOLERANT, like `readStoredAvatarBuild`: a malformed row is still GATED (so it stays hidden)
+ * but is never OWNED. Erring that way costs the owner a tile until it is fixed; erring the other
+ * way would offer an asset to someone the lock will then refuse.
+ */
+export function toAvatarAccess(rows: readonly GatedAssetRow[]): AvatarAccess {
+  const gated = new Set<string>()
+  const owned = new Map<string, GrantSource>()
+  for (const r of rows) {
+    if (typeof r.slot !== 'string' || typeof r.asset_key !== 'string') continue
+    const k = accessKey(r.slot, r.asset_key)
+    gated.add(k)
+    const grants = Array.isArray(r.avatar_asset_grants) ? r.avatar_asset_grants : []
+    const source = (grants[0] as { source?: unknown } | undefined)?.source
+    if (isGrantSource(source)) owned.set(k, source)
+  }
+  return { gated, owned }
+}
+
+/** What a picker may offer for one slot: every free asset, plus the gated ones this member owns. */
+export function pickableKeys(
+  slot: GateableSlot, keys: readonly string[], access: AvatarAccess,
+): string[] {
+  return keys.filter((k) => {
+    const a = accessKey(slot, k)
+    return !access.gated.has(a) || access.owned.has(a)
+  })
+}
+
+/** How this member came to own `key`, or null if it is free or not theirs. Drives the Gift tag. */
+export function ownedSource(
+  slot: GateableSlot, key: string | null, access: AvatarAccess,
+): GrantSource | null {
+  return key === null ? null : access.owned.get(accessKey(slot, key)) ?? null
+}

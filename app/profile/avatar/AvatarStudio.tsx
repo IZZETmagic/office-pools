@@ -25,6 +25,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { AvatarBuilder } from '@/components/avatar/AvatarBuilder'
+import { useAvatarAccess } from '@/components/avatar/useAvatarAccess'
 import { useAvatarAssets } from '@/components/avatar/useAvatarAssets'
 import { composeAvatar, type AvatarConfig } from '@/lib/avatar/compose'
 import {
@@ -75,6 +76,9 @@ export default function AvatarStudio({
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const { assets, error: assetsError } = useAvatarAssets()
+  // ⚠ The editor waits for this as it waits for the art — the pickers cannot tell a gated asset
+  // from a free one without it (migration 183).
+  const { access, error: accessError } = useAvatarAccess(supabase)
 
   const [colour, setColour] = useState<string | null>(avatarColour)
   const [build, setBuild] = useState<StoredAvatarBuild | null>(null)
@@ -163,17 +167,24 @@ export default function AvatarStudio({
 
     setSaving(false)
     if (error) {
-      setSaveError(error.message)
+      // ⚠ 42501 is the ownership lock (183) — an asset this member does not own reached the
+      // save, which the picker never offers, so it means a tab opened before a deploy. The raw
+      // message names the slot, the asset key and a user id; none of that is for the member.
+      setSaveError(
+        error.code === '42501'
+          ? 'One of those items isn’t available for your avatar. Reload the page and try again.'
+          : error.message,
+      )
       return
     }
     setBuild(null)
     router.push('/profile?tab=account')
   }
 
-  if (assetsError) {
+  if (assetsError || accessError) {
     return (
       <div className="max-w-5xl mx-auto p-6">
-        <p className="text-sm text-danger-600">{assetsError}</p>
+        <p className="text-sm text-danger-600">{assetsError ?? accessError}</p>
       </div>
     )
   }
@@ -198,7 +209,7 @@ export default function AvatarStudio({
         <p className="text-[13px] text-danger-600 mb-4">{saveError}</p>
       )}
 
-      {!assets ? (
+      {!assets || !access ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : (
         <>
@@ -247,7 +258,7 @@ export default function AvatarStudio({
             </div>
 
             <div className="flex-1 min-w-0 p-5 sm:p-6 lg:overflow-y-auto">
-              <AvatarBuilder assets={assets} cfg={cfg} set={set} />
+              <AvatarBuilder assets={assets} access={access} cfg={cfg} set={set} />
             </div>
           </div>
 

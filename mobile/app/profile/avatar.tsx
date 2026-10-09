@@ -22,9 +22,13 @@ import { composeAvatar, headOnly, PALETTE, type AvatarConfig } from '@/lib/avata
 import { GlassesIcon, HeadIcon, MoustacheIcon } from '@/lib/avatar/stepIcons';
 import {
   isStoredAvatarBuild,
+  ownedSource,
+  pickableKeys,
   readStoredAvatarBuild,
   toAvatarConfig,
   toStoredAvatarBuild,
+  type AvatarAccess,
+  type GateableSlot,
   type StoredAvatarBuild,
 } from '@/lib/avatar/storedConfig';
 import {
@@ -38,6 +42,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { hapticFailure, hapticPress, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
+import { useAvatarAccess } from '@/lib/useAvatarAccess';
 import { useAvatarAssets } from '@/lib/useAvatarAssets';
 import { invalidateMyAvatar } from '@/lib/useMyAvatar';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -88,6 +93,10 @@ type Step = (typeof STEPS)[number]['key'];
  */
 const METALS = [PALETTE.metal[0], PALETTE.metal[1]] as const;
 
+/** "Gift" on a tile this member was given (migration 183). Nothing for anyone else. */
+const giftTag = (slot: GateableSlot, access: AvatarAccess) => (key: string | null) =>
+  ownedSource(slot, key, access) === 'gift' ? 'Gift' : null;
+
 const HEAD_GROUND = '#FF00FF';
 const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/;
 /** ⚠ Reaches OUTSIDE the 2048 canvas, which is why the tile carries the same colour behind it. */
@@ -117,6 +126,9 @@ export default function AvatarEditorScreen() {
   const { height, width } = useWindowDimensions();
   const { user } = useAuth();
   const { assets, error: assetsError } = useAvatarAssets();
+  // ⚠ The grids wait for this as they wait for the art — without the gated list a gated asset
+  // and a free one look identical (migration 183).
+  const { access, error: accessError } = useAvatarAccess(!!user);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [storedRaw, setStoredRaw] = useState<unknown>(null);
@@ -259,11 +271,11 @@ export default function AvatarEditorScreen() {
   const avatarSize = Math.min(height / 3, width);
   const bandHeight = insets.top + avatarSize;
 
-  if (assetsError) {
+  if (assetsError || accessError) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.snow, padding: 24, paddingTop: insets.top + 24 }}>
         <RNText style={{ fontFamily: fontFamilies.medium, color: theme.colors.ink }}>
-          {assetsError}
+          {assetsError ?? accessError}
         </RNText>
         <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
           <RNText style={{ fontFamily: fontFamilies.bold, color: theme.colors.primary }}>Close</RNText>
@@ -359,7 +371,7 @@ export default function AvatarEditorScreen() {
       </View>
 
       {/* ---- 3. the assets, scrolling, edge to edge ----------------------------------------- */}
-      {!assets || !loaded ? (
+      {!assets || !loaded || !access ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
@@ -413,7 +425,8 @@ export default function AvatarEditorScreen() {
                   assets={assets}
                   cfg={current}
                   field="hair"
-                  options={[null, ...Object.keys(assets.hair)]}
+                  options={[null, ...pickableKeys('hair', Object.keys(assets.hair), access)]}
+                  tag={giftTag('hair', access)}
                   value={current.hair}
                   onPick={(k) => set('hair', k)}
                   tileSize={tileSize}
@@ -436,7 +449,8 @@ export default function AvatarEditorScreen() {
                   assets={assets}
                   cfg={current}
                   field="glasses"
-                  options={[null, ...Object.keys(assets.glasses ?? {})]}
+                  options={[null, ...pickableKeys('glasses', Object.keys(assets.glasses ?? {}), access)]}
+                  tag={giftTag('glasses', access)}
                   value={current.glasses}
                   onPick={(k) => set('glasses', k)}
                   tileSize={tileSize}
@@ -456,10 +470,11 @@ export default function AvatarEditorScreen() {
                   field="earrings"
                   options={[
                     null,
-                    ...Object.keys(assets.earrings ?? {}).flatMap((e) =>
-                      METALS.map((m) => `${e}|${m}`),
+                    ...pickableKeys('earrings', Object.keys(assets.earrings ?? {}), access).flatMap(
+                      (e) => METALS.map((m) => `${e}|${m}`),
                     ),
                   ]}
+                  tag={(k) => giftTag('earrings', access)(k ? k.split('|')[0] : null)}
                   value={
                     current.earrings
                       ? `${current.earrings}|${current.metalColour ?? METALS[0]}`
@@ -515,7 +530,8 @@ export default function AvatarEditorScreen() {
                   assets={assets}
                   cfg={current}
                   field="facialHair"
-                  options={[null, ...Object.keys(assets.facialhair)]}
+                  options={[null, ...pickableKeys('facialHair', Object.keys(assets.facialhair), access)]}
+                  tag={giftTag('facialHair', access)}
                   value={current.facialHair}
                   onPick={(k) => set('facialHair', k)}
                   tileSize={tileSize}
@@ -545,7 +561,8 @@ export default function AvatarEditorScreen() {
                   assets={assets}
                   cfg={current}
                   field="garment"
-                  options={[null, ...Object.keys(assets.garments ?? {})]}
+                  options={[null, ...pickableKeys('garment', Object.keys(assets.garments ?? {}), access)]}
+                  tag={giftTag('garment', access)}
                   value={current.garment}
                   onPick={(k) => set('garment', k)}
                   tileSize={tileSize}
@@ -816,6 +833,7 @@ function Heads({
   value,
   onPick,
   tileSize,
+  tag,
 }: {
   assets: NonNullable<ReturnType<typeof useAvatarAssets>['assets']>;
   cfg: StoredAvatarBuild;
@@ -831,6 +849,8 @@ function Heads({
   value: string | null | undefined;
   onPick: (k: string | null) => void;
   tileSize: number;
+  /** A word pinned to the tile's corner — today only "Gift", on an asset this member was given. */
+  tag?: (k: string | null) => string | null;
 }) {
   const theme = useTheme();
 
@@ -922,6 +942,38 @@ function Heads({
           }}
         >
           <SvgXml xml={head} width={tileSize - 12} height={tileSize - 12} />
+          {(() => {
+            const t = tag?.(k) ?? null;
+            if (!t) return null;
+            // ⭐ The app's pill recipe (the mode pill in PoolDetailHeader) on an OPAQUE surface:
+            // the tint alone is 10% primary, and over the art the hair would show through the word.
+            return (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  borderRadius: theme.radii.pill,
+                  backgroundColor: theme.colors.surface,
+                }}
+              >
+                <View
+                  style={{
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: 3,
+                    borderRadius: theme.radii.pill,
+                    backgroundColor: withOpacity(theme.colors.primary, 0.1),
+                  }}
+                >
+                  <RNText
+                    style={{ fontFamily: fontFamilies.semibold, fontSize: 11, color: theme.colors.primary }}
+                  >
+                    {t}
+                  </RNText>
+                </View>
+              </View>
+            );
+          })()}
         </Pressable>
       ))}
     </View>

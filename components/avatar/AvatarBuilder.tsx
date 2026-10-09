@@ -28,7 +28,11 @@ import {
   BackgroundIcon, HatIcon, Relieved02Icon, ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 import { GlassesIcon, HeadIcon, MoustacheIcon } from './stepIcons'
+import { Badge } from '@/components/ui/Badge'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
+import {
+  ownedSource, pickableKeys, type AvatarAccess, type GateableSlot,
+} from '@/lib/avatar/storedConfig'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
 
 const TITLE = (s: string) =>
@@ -227,7 +231,7 @@ const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/
 const ASSET_TILE = 120
 
 function AssetCards({
-  options, value, onChange, render, label,
+  options, value, onChange, render, label, tag,
 }: {
   options: (string | null)[]
   value: string | null
@@ -235,6 +239,8 @@ function AssetCards({
   render: (key: string | null) => string
   /** For a composite key that cannot name itself — see the earrings grid. */
   label?: (key: string | null) => string
+  /** A word pinned to the tile's corner — today only "Gift", on an asset this member was given. */
+  tag?: (key: string | null) => string | null
 }) {
   return (
     <div
@@ -243,6 +249,8 @@ function AssetCards({
     >
       {options.map((o) => {
         const selected = o === value
+        const name = label ? label(o) : o === null ? 'None' : TITLE(o)
+        const t = tag?.(o) ?? null
         return (
           /* ⚠ THE NAME MOVES TO THE BUTTON, it is not lost. The caption under each tile is
              gone — Ryan, 2026-09-26 — but a picker whose options carry no accessible name is
@@ -253,9 +261,9 @@ function AssetCards({
             type="button"
             onClick={() => onChange(o)}
             aria-pressed={selected}
-            aria-label={label ? label(o) : o === null ? 'None' : TITLE(o)}
-            title={label ? label(o) : o === null ? 'None' : TITLE(o)}
-            className="group text-left"
+            aria-label={t ? `${name} (${t})` : name}
+            title={t ? `${name} (${t})` : name}
+            className="group text-left relative"
           >
             {/* ⚠⚠ `h-auto` ON THE SVG, NOT `h-full`, AND IT IS NOT COSMETIC. With `h-full` the
                 tile is square ONLY IF the browser honours `aspect-ratio`: Chrome does, so the
@@ -285,6 +293,14 @@ function AssetCards({
               } [&>svg]:w-full [&>svg]:h-auto [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
+            {/* ⭐ The house Badge, on an OPAQUE surface chip. Badge's ground is the text colour
+                at 12%, which over the art would let the hair show through the word. The
+                surface underneath makes it a pill on a pill, legible on any asset. */}
+            {t && (
+              <span className="absolute top-1.5 right-1.5 rounded-pill bg-surface" aria-hidden>
+                <Badge>{t}</Badge>
+              </span>
+            )}
           </button>
         )
       })}
@@ -366,13 +382,28 @@ const METALS = [
   { label: 'Silver', colour: PALETTE.metal[1] },
 ] as const
 
-export function AvatarBuilder({ assets, cfg, set }: {
+export function AvatarBuilder({ assets, access, cfg, set }: {
   assets: AvatarAssets
+  /**
+   * Which gated assets this member may wear (migration 183).
+   *
+   * ⚠⚠ REQUIRED, so no host can forget it. `'unfiltered'` is the admin gallery's answer, which
+   * must show every asset that exists. A member's editor passes the real `AvatarAccess` and must
+   * not render this component before it has one — see lib/avatar/storedConfig.ts.
+   */
+  access: AvatarAccess | 'unfiltered'
   /** ⚠ Carries `background`, because the CARDS need a ground to draw on. It is not what the
    *  host stores — see the header. */
   cfg: AvatarConfig
   set: <K extends keyof AvatarConfig>(k: K, v: AvatarConfig[K]) => void
 }) {
+  /** The keys a gateable grid may offer: free ones, plus the gated ones this member owns. */
+  const offer = (slot: GateableSlot, keys: string[]) =>
+    access === 'unfiltered' ? keys : pickableKeys(slot, keys, access)
+
+  /** "Gift" on a tile this member was given. Nothing on the admin gallery, nothing for anyone else. */
+  const giftTag = (slot: GateableSlot) => (key: string | null) =>
+    access !== 'unfiltered' && ownedSource(slot, key, access) === 'gift' ? 'Gift' : null
 
   /**
    * A bare head wearing one asset, cropped to the head, for the picker cards.
@@ -618,8 +649,8 @@ export function AvatarBuilder({ assets, cfg, set }: {
                 onChange={(c) => set('hairColour', c)} />
             </Section>
             <Section title="Hair">
-              <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
-                onChange={(v) => set('hair', v)} render={headPreview} />
+              <AssetCards options={[null, ...offer('hair', Object.keys(assets.hair))]} value={cfg.hair}
+                onChange={(v) => set('hair', v)} render={headPreview} tag={giftTag('hair')} />
             </Section>
           </>
         )}
@@ -631,9 +662,9 @@ export function AvatarBuilder({ assets, cfg, set }: {
                 onChange={(c) => set('frameColour', c)} />
             </Section>
             <Section title="Glasses">
-              <AssetCards options={[null, ...Object.keys(assets.glasses ?? {})]}
+              <AssetCards options={[null, ...offer('glasses', Object.keys(assets.glasses ?? {}))]}
                 value={cfg.glasses ?? null} onChange={(v) => set('glasses', v)}
-                render={glassesPreview} />
+                render={glassesPreview} tag={giftTag('glasses')} />
             </Section>
 
             {/* ⭐ Ryan, 2026-09-26: gold and silver as two rows, both shown. One click picks the
@@ -648,8 +679,9 @@ export function AvatarBuilder({ assets, cfg, set }: {
                 like the options is not an option. */}
             <Section title="Earrings">
               <AssetCards
-                options={[null, ...Object.keys(assets.earrings ?? {})
+                options={[null, ...offer('earrings', Object.keys(assets.earrings ?? {}))
                   .flatMap((e) => METALS.map((m) => `${e}|${m.colour}`))]}
+                tag={(k) => giftTag('earrings')(k ? k.split('|')[0] : null)}
                 value={cfg.earrings ? `${cfg.earrings}|${cfg.metalColour ?? METALS[0].colour}` : null}
                 onChange={(v) => {
                   if (!v) return set('earrings', null)
@@ -698,9 +730,9 @@ export function AvatarBuilder({ assets, cfg, set }: {
               </p>
             </Section>
             <Section title="Facial hair">
-              <AssetCards options={[null, ...Object.keys(assets.facialhair)]}
+              <AssetCards options={[null, ...offer('facialHair', Object.keys(assets.facialhair))]}
                 value={cfg.facialHair} onChange={(v) => set('facialHair', v)}
-                render={facialHairPreview} />
+                render={facialHairPreview} tag={giftTag('facialHair')} />
             </Section>
           </>
         )}
@@ -733,9 +765,9 @@ export function AvatarBuilder({ assets, cfg, set }: {
             {/* ⚠ "None" is the BASE SHIRT, not the absence of clothing — the avatar always
                 wears something — so the first tile is a real choice and shows what it gives. */}
             <Section title="Shirt">
-              <AssetCards options={[null, ...Object.keys(assets.garments ?? {})]}
+              <AssetCards options={[null, ...offer('garment', Object.keys(assets.garments ?? {}))]}
                 value={cfg.garment ?? null} onChange={(v) => set('garment', v)}
-                render={garmentPreview} />
+                render={garmentPreview} tag={giftTag('garment')} />
             </Section>
           </>
         )}

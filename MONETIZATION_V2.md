@@ -138,9 +138,11 @@ Built-state is as of 2026-09-29 and verified against the repo, not assumed.
 
 ### 5a. ✅ Sellable — identity and cosmetics
 
-The strongest lane, and the only one whose architecture is already reserved: migration **147**
-explicitly keeps `users.avatar_config jsonb` for *"EQUIPPED, PAID cosmetics"*, separate from the free
-`avatar_build`.
+The strongest lane, and the only one whose ownership layer is already designed: migration **183**
+(2026-10-09) adds `avatar_gated_assets` + `avatar_asset_grants` and a database lock on
+`avatar_build`, built for a one-off gift and meant to carry earned and paid items later. ⚠ 147's
+reservation of `users.avatar_config` for *"EQUIPPED, PAID cosmetics"* is **retired** by 183: an owned
+item is equipped in `avatar_build` like any other, under the lock. See rule 17.
 
 | # | Item | Built? | Source | Tests | Indicative |
 |---|---|---|---|---|---|
@@ -253,10 +255,17 @@ refund, stated on the paywall itself**, exactly as v1 concluded for the admin ti
    written by the **browser with the anon key**, guarded only for shape and length, and `145`'s
    privilege trigger is a deny-list of named columns that *cannot see inside jsonb*. An entitlement
    stored as a key in there would be settable with a single PATCH. **Paid items need their own table
-   with its own policy.**
-2. **Render must intersect, not trust.** `avatar_config` (the *equipped* selection) is member-writable
-   by the same route. So the renderer composes `equipped ∩ entitled`, server-side. A forged PATCH then
-   equips nothing, and there is no second place where "do they own this?" is decided.
+   with its own policy.** ✅ *2026-10-09: that table is `avatar_asset_grants` (183). Ownership lives
+   there and never in the JSON; the item itself is equipped in `avatar_build`, which is no longer
+   unguarded — see constraint 2.*
+2. ~~**Render must intersect, not trust.** `avatar_config` (the *equipped* selection) is member-writable
+   by the same route. So the renderer composes `equipped ∩ entitled`, server-side.~~ **Amended
+   2026-10-09 (Ryan), migration 183: the lock is at WRITE, not render.** There is no single server
+   render to intersect at: the phone reads `avatar_build` straight from Supabase (`useHomeData`,
+   `useMemberRoster`, `useMemberDetail`) and composes on the device. A trigger on `users` refuses any
+   unowned gated asset on every write, from every role including the service role, and deleting a
+   grant takes the asset off the face in the same transaction. Nothing un-owned is ever stored, so
+   nothing un-owned is ever drawn, and "do they own this?" is still decided in exactly one place.
 3. **Account-scoped, never pool-scoped.** `pool_purchases` (067) is correctly keyed on `pool_id` and
    stays that way for admin tiers. Player purchases need a sibling keyed on `user_id`. Pool-scoping
    them would mean a row per (user, pool) and every screen answering *"do I have this here?"* — which
@@ -349,7 +358,9 @@ v1's thirteen, plus five. Rule 1 remains the withdrawal test.
     Reviewed as copy, enforced as a test over the paywall strings.
 16. 🆕 **The player shop is reached from the account, never from inside a pool.**
 17. 🆕 **A paid entitlement never lives in a member-writable column.** Its own table, its own policy,
-    and the renderer intersects equipped-with-entitled server-side.
+    and ~~the renderer intersects equipped-with-entitled server-side~~ **a database lock refuses an
+    unowned item at write, and a revoke removes it** (amended 2026-10-09, migration 183 — see §6
+    constraint 2 for why).
 18. 🆕 **Nothing live and free moves behind a player paywall.**
 
 ---
