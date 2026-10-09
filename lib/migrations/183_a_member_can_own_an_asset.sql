@@ -230,6 +230,14 @@ grant select on public.avatar_asset_grants to authenticated;
 grant select, insert, update, delete on public.avatar_gated_assets to service_role;
 grant select, insert, update, delete on public.avatar_asset_grants to service_role;
 
+-- ⚠ The three trigger functions are SECURITY DEFINER, and PUBLIC holds EXECUTE on every new
+-- function by default — the advisor's `anon_security_definer_function_executable` (145's guard is
+-- on that list today). Revoked, as 172 does. A trigger still fires: Postgres checks EXECUTE on a
+-- trigger function when the trigger is CREATED, never when it fires.
+revoke all on function public.guard_gated_avatar_assets() from public, anon, authenticated;
+revoke all on function public.strip_revoked_avatar_asset() from public, anon, authenticated;
+revoke all on function public.guard_gating_a_worn_asset() from public, anon, authenticated;
+
 do $$
 begin
   if not exists (

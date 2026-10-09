@@ -1,8 +1,10 @@
 # Avatar asset grants: one member can own an asset nobody else can wear
 
-**Status:** APPROVED 2026-10-09 (rule-17 change ✅, Gift tag ✅). Steps 1–2 BUILT and committed;
-migration 183 verified in a rolled-back transaction against production (16/16) but **not applied**.
-Nothing pushed, no OTA. Step 3 waits on Q1 (what the gift is).
+**Status:** APPROVED 2026-10-09 (rule-17 change ✅, Gift tag ✅). Steps 1–2 BUILT and committed.
+✅ **183 APPLIED to production 2026-10-09** (after 184, which another session applied first; they
+are independent). Re-verified live 16/16 with `scripts/verify-avatar-grants.sql`; zero new security
+advisor findings. Nothing pushed, no OTA yet. **Q1 answered: a queen's crown, which is HEADWEAR, a
+new layer.** Planned separately.
 
 **Built differently from this draft, deliberately:**
 - `anon` reads **nothing** (the draft said everyone). The only reader is the signed-in editor.
