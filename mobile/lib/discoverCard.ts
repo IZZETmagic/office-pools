@@ -21,6 +21,8 @@ export type MatchweekRow = {
   season_id: string;
   matchweek_number: number;
   lock_at: string | null;
+  first_kickoff_at?: string | null;
+  fixture_count?: number | null;
 };
 
 /** Where one league season is, for every pool playing it. */
@@ -28,6 +30,13 @@ export type SeasonClock = {
   /** The matchweek a joiner would pick in next, or null once the season is over. */
   openMatchweek: number | null;
   openLockAt: string | null;
+  /** How many matches the open week has — "all 10 Premier League matches". */
+  openFixtureCount: number | null;
+  /**
+   * Minutes between the open week's lock and its first kick-off. Read, not
+   * assumed: migration 101 made it 60 from matchweek 3 on, and 0 before.
+   */
+  openLockLeadMinutes: number | null;
   total: number;
   /** Every matchweek's lock, for a pool that starts later than the open one. */
   lockAt: Record<number, string | null>;
@@ -45,9 +54,15 @@ export function seasonClocks(rows: MatchweekRow[], now: Date): Map<string, Seaso
   for (const [seasonId, list] of bySeason) {
     list.sort((a, b) => a.matchweek_number - b.matchweek_number);
     const open = list.find((r) => r.lock_at != null && new Date(r.lock_at).getTime() > now.getTime()) ?? null;
+    const lead =
+      open?.lock_at && open.first_kickoff_at
+        ? Math.round((new Date(open.first_kickoff_at).getTime() - new Date(open.lock_at).getTime()) / 60_000)
+        : null;
     out.set(seasonId, {
       openMatchweek: open?.matchweek_number ?? null,
       openLockAt: open?.lock_at ?? null,
+      openFixtureCount: open?.fixture_count ?? null,
+      openLockLeadMinutes: lead,
       total: list.reduce((max, r) => Math.max(max, r.matchweek_number), 0),
       lockAt: Object.fromEntries(list.map((r) => [r.matchweek_number, r.lock_at])),
     });

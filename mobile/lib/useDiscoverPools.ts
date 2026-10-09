@@ -38,7 +38,22 @@ export type DiscoverPool = {
 type TournamentEmbed = { external_league_id: number | null };
 type AdminEmbed = { username: string | null; full_name: string | null };
 
-type PoolRow = {
+/**
+ * The columns a Discover card needs. Shared with the pool preview
+ * (app/pool-preview/[id].tsx), which opens on the same card — one select, so
+ * the two cannot disagree about a pool.
+ */
+export const DISCOVER_POOL_COLUMNS = `
+  pool_id, pool_name, pool_code, description,
+  prediction_mode, league_mode, league_depth, league_start_matchweek,
+  league_table_lock_at, league_season_id,
+  brand_name, brand_emoji, brand_color,
+  status, prediction_deadline, is_private, created_at,
+  tournaments(external_league_id),
+  admin:users!pools_admin_user_id_fkey(username, full_name)
+`;
+
+export type DiscoverPoolRow = {
   pool_id: string;
   pool_name: string;
   pool_code: string;
@@ -54,6 +69,7 @@ type PoolRow = {
   brand_color: string | null;
   status: string;
   prediction_deadline: string | null;
+  is_private: boolean;
   created_at: string;
   // Many-to-one embeds come back as an OBJECT, but the typed client infers an
   // array — so both shapes are accepted, and `one()` reads either.
@@ -76,6 +92,59 @@ function adminNameOf(admin: AdminEmbed | null): string | null {
   const username = admin?.username?.trim();
   if (username) return username;
   return admin?.full_name?.trim() || null;
+}
+
+/**
+ * Rows → cards: one call for every player count and one for every season's
+ * matchweeks, never one query per pool. Exported for the pool preview.
+ */
+export async function toDiscoverPools(rows: DiscoverPoolRow[]): Promise<DiscoverPool[]> {
+  const seasonIds = [...new Set(rows.map((r) => r.league_season_id).filter((s): s is string => !!s))];
+  const [countsRes, matchweeksRes] = await Promise.all([
+    rows.length
+      ? supabase.rpc('public_pool_member_counts', { p_pool_ids: rows.map((r) => r.pool_id) })
+      : Promise.resolve({ data: [], error: null }),
+    seasonIds.length
+      ? supabase
+          .from('league_matchweeks')
+          .select('season_id, matchweek_number, lock_at, first_kickoff_at, fixture_count')
+          .in('season_id', seasonIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (countsRes.error) throw countsRes.error;
+  if (matchweeksRes.error) throw matchweeksRes.error;
+
+  const counts = new Map(
+    ((countsRes.data ?? []) as Array<{ pool_id: string; member_count: number }>).map((c) => [
+      c.pool_id,
+      c.member_count,
+    ]),
+  );
+  const clocks = seasonClocks((matchweeksRes.data ?? []) as MatchweekRow[], new Date());
+
+  return rows.map((row) => ({
+    poolId: row.pool_id,
+    poolName: row.pool_name,
+    poolCode: row.pool_code,
+    description: row.description,
+    predictionMode: row.prediction_mode,
+    leagueMode: row.league_mode,
+    leagueDepth: row.league_depth,
+    leagueStartMatchweek: row.league_start_matchweek,
+    leagueTableLockAt: row.league_table_lock_at,
+    externalLeagueId: one(row.tournaments)?.external_league_id ?? null,
+    createdAt: row.created_at,
+    brandName: row.brand_name,
+    brandEmoji: row.brand_emoji,
+    brandColor: row.brand_color,
+    status: row.status,
+    predictionDeadline: row.prediction_deadline,
+    // ⚠ A PRIVATE POOL IS NOT IN 184'S RESULT — the preview tops this up with
+    // its own RLS count for a pool the reader belongs to.
+    memberCount: counts.get(row.pool_id) ?? 0,
+    adminName: adminNameOf(one(row.admin)),
+    seasonClock: row.league_season_id ? (clocks.get(row.league_season_id) ?? null) : null,
+  }));
 }
 
 /**
@@ -131,17 +200,7 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
 
         const { data: poolRows, error: poolErr } = await supabase
           .from('pools')
-          .select(
-            `
-            pool_id, pool_name, pool_code, description,
-            prediction_mode, league_mode, league_depth, league_start_matchweek,
-            league_table_lock_at, league_season_id,
-            brand_name, brand_emoji, brand_color,
-            status, prediction_deadline, is_private, created_at,
-            tournaments(external_league_id),
-            admin:users!pools_admin_user_id_fkey(username, full_name)
-          `,
-          )
+          .select(DISCOVER_POOL_COLUMNS)
           .eq('is_private', false)
           .eq('status', 'open')
           // ⚠ `status = 'open'` DOES NOT EXCLUDE AN ARCHIVED POOL. Archiving
@@ -155,54 +214,10 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
 
         if (poolErr) throw poolErr;
 
-        const rows = ((poolRows ?? []) as unknown as PoolRow[]).filter((r) => !joinedSet.has(r.pool_id));
-
-        // One call for every count, and one for every season's matchweeks — not
-        // one query per pool.
-        const seasonIds = [...new Set(rows.map((r) => r.league_season_id).filter((s): s is string => !!s))];
-        const [countsRes, matchweeksRes] = await Promise.all([
-          rows.length
-            ? supabase.rpc('public_pool_member_counts', { p_pool_ids: rows.map((r) => r.pool_id) })
-            : Promise.resolve({ data: [], error: null }),
-          seasonIds.length
-            ? supabase
-                .from('league_matchweeks')
-                .select('season_id, matchweek_number, lock_at')
-                .in('season_id', seasonIds)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
-        if (countsRes.error) throw countsRes.error;
-        if (matchweeksRes.error) throw matchweeksRes.error;
-
-        const counts = new Map(
-          ((countsRes.data ?? []) as Array<{ pool_id: string; member_count: number }>).map((c) => [
-            c.pool_id,
-            c.member_count,
-          ]),
+        const rows = ((poolRows ?? []) as unknown as DiscoverPoolRow[]).filter(
+          (r) => !joinedSet.has(r.pool_id),
         );
-        const clocks = seasonClocks((matchweeksRes.data ?? []) as MatchweekRow[], new Date());
-
-        const mapped: DiscoverPool[] = rows.map((row) => ({
-          poolId: row.pool_id,
-          poolName: row.pool_name,
-          poolCode: row.pool_code,
-          description: row.description,
-          predictionMode: row.prediction_mode,
-          leagueMode: row.league_mode,
-          leagueDepth: row.league_depth,
-          leagueStartMatchweek: row.league_start_matchweek,
-          leagueTableLockAt: row.league_table_lock_at,
-          externalLeagueId: one(row.tournaments)?.external_league_id ?? null,
-          createdAt: row.created_at,
-          brandName: row.brand_name,
-          brandEmoji: row.brand_emoji,
-          brandColor: row.brand_color,
-          status: row.status,
-          predictionDeadline: row.prediction_deadline,
-          memberCount: counts.get(row.pool_id) ?? 0,
-          adminName: adminNameOf(one(row.admin)),
-          seasonClock: row.league_season_id ? (clocks.get(row.league_season_id) ?? null) : null,
-        }));
+        const mapped = await toDiscoverPools(rows);
 
         // Order is the filter's job — `applyDiscoverFilters` in
         // lib/discoverFilter.ts, where "Popular" is the order this used to be.

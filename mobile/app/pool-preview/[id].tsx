@@ -1,42 +1,46 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, ScrollView, Share, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, Pressable } from '@/components/ui';
+import { DiscoverPoolCard } from '@/components/pools';
+import { Icon, Pressable, Text } from '@/components/ui';
 import { joinPool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { howItWorks, leaguePointsCards, shareMessage, type PointsCard } from '@/lib/poolPreview';
 import { supabase } from '@/lib/supabase';
+import {
+  DISCOVER_POOL_COLUMNS,
+  toDiscoverPools,
+  type DiscoverPool,
+  type DiscoverPoolRow,
+} from '@/lib/useDiscoverPools';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-// expo-clipboard is an optional native module — same defensive require
-// pattern as SettingsTab. Lets the screen render in tooling where the
-// module isn't linked yet; production builds always have it.
-let Clipboard: typeof import('expo-clipboard') | null = null;
-try {
-  Clipboard = require('expo-clipboard');
-} catch {
-  Clipboard = null;
-}
+// =============================================================
+// The pool preview — what opens when you tap a pool on Discover
+// =============================================================
+// Preview A (Ryan, 2026-10-09): "card A, grown up". The Discover card itself
+// at the top (`DiscoverPoolCard variant="hero"`), then How it works, then the
+// pool's own points, with Share and Join pinned below.
+//
+// ⚠ IT DESCRIBED A WORLD CUP POOL WHATEVER IT OPENED ON — "Pool" for the game,
+// the season's last kick-off as the "Deadline", World Cup group-stage and
+// penalty-shootout scoring for a Premier League pool, and a Share button that
+// sent "Join MY World Cup prediction pool". The copy and the numbers now come
+// from lib/poolPreview.ts, which is tested; the card's facts come from the same
+// select Discover uses, so the two cannot disagree.
+// =============================================================
 
-type PoolDetail = {
-  poolId: string;
-  poolName: string;
-  poolCode: string;
-  description: string | null;
-  predictionMode: string;
-  brandName: string | null;
-  brandEmoji: string | null;
-  brandColor: string | null;
-  predictionDeadline: string | null;
+type PoolMeta = {
   maxParticipants: number | null;
   maxEntriesPerUser: number;
-  memberCount: number;
-  alreadyJoined: boolean;
+  isPrivate: boolean;
 };
 
 type PoolSettingsRow = {
-  // Full-tournament / progressive mode — per-match scoring.
+  // The per-match prices — World Cup pools AND league Pick'em / Showdown, whose
+  // engine prices against these same columns.
   group_exact_score: number;
   group_correct_difference: number;
   group_correct_result: number;
@@ -66,52 +70,19 @@ type PoolSettingsRow = {
   bp_penalty_correct: number | null;
 };
 
-const MODE_LABEL: Record<string, string> = {
-  full_tournament: 'Full Tournament',
-  progressive: 'Progressive',
-  bracket_picker: 'Bracket Picker',
-};
-
-const MODE_COLOR: Record<string, string> = {
-  full_tournament: '#3B6EFF',
-  progressive: '#059669',
-  bracket_picker: '#D97706',
-};
-
-function brandHex(hex: string | null): string | null {
-  if (!hex) return null;
-  return hex.startsWith('#') ? hex : `#${hex}`;
-}
-
-function formatLongDate(iso: string | null): string {
-  if (!iso) return 'No deadline';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
+const WORLD_CUP_MODES = new Set(['full_tournament', 'progressive', 'bracket_picker']);
 
 export default function PoolPreviewSheet() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [detail, setDetail] = useState<PoolDetail | null>(null);
+  const [pool, setPool] = useState<DiscoverPool | null>(null);
+  const [meta, setMeta] = useState<PoolMeta | null>(null);
   const [settings, setSettings] = useState<PoolSettingsRow | null>(null);
+  const [alreadyJoined, setAlreadyJoined] = useState(false);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Pool-code tap-to-copy feedback. Flips true on tap, reverts after 2s.
-  // 2s matches the existing SettingsTab copy pattern — long enough for
-  // the user to register the green confirmation, short enough to feel
-  // snappy. Industry standard hovers in the 1.5–2s range (Slack, GitHub,
-  // Notion all sit here).
-  const [codeCopied, setCodeCopied] = useState(false);
   // Refresh the home dashboard's pool list after a successful join so the
   // new card shows up on Home and Pools tabs immediately.
   const { refresh: refreshHomeData } = useHomeData();
@@ -123,15 +94,13 @@ export default function PoolPreviewSheet() {
       try {
         const { data: authData } = await supabase.auth.getUser();
         const authUserId = authData.user?.id;
-        const [{ data: userData }, { data: poolData }, { data: settingsData }] = await Promise.all([
+        const [{ data: userData }, poolRes, settingsRes] = await Promise.all([
           authUserId
             ? supabase.from('users').select('user_id').eq('auth_user_id', authUserId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('pools')
-            .select(
-              'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, prediction_deadline, max_participants, max_entries_per_user',
-            )
+            .select(`${DISCOVER_POOL_COLUMNS}, max_participants, max_entries_per_user`)
             .eq('pool_id', id)
             .maybeSingle(),
           supabase
@@ -146,70 +115,44 @@ export default function PoolPreviewSheet() {
             .eq('pool_id', id)
             .maybeSingle(),
         ]);
+        if (poolRes.error) throw poolRes.error;
 
         if (cancelled) return;
-        if (!poolData) {
+        const row = poolRes.data as unknown as
+          | (DiscoverPoolRow & { max_participants: number | null; max_entries_per_user: number })
+          | null;
+        if (!row) {
           setError('Pool not found.');
           setLoading(false);
           return;
         }
 
-        // ⚠ A NON-MEMBER CANNOT COUNT `pool_members` — the table is readable
-        // only by a pool's own members, so this preview told everyone deciding
-        // whether to join that the pool was empty. Migration 184's
-        // `public_pool_member_counts` returns the number (and only the number)
-        // for a public pool; a private pool you are in still counts the old way.
-        const [{ data: publicCounts }, { count: memberRowCount }] = await Promise.all([
-          supabase.rpc('public_pool_member_counts', { p_pool_ids: [id] }),
-          supabase
-            .from('pool_members')
-            .select('*', { count: 'exact', head: true })
-            .eq('pool_id', id),
+        const [[card], { count: memberRowCount }, joinedRes] = await Promise.all([
+          toDiscoverPools([row]),
+          // ⚠ ONLY FOR A PRIVATE POOL YOU ARE IN. A non-member counting
+          // `pool_members` always gets 0 (members-only policy), which is why
+          // public pools are counted by migration 184's function instead.
+          row.is_private
+            ? supabase.from('pool_members').select('*', { count: 'exact', head: true }).eq('pool_id', id)
+            : Promise.resolve({ count: null }),
+          userData
+            ? supabase
+                .from('pool_members')
+                .select('*', { count: 'exact', head: true })
+                .eq('pool_id', id)
+                .eq('user_id', (userData as { user_id: string }).user_id)
+            : Promise.resolve({ count: 0 }),
         ]);
-        const publicCount = (publicCounts as Array<{ member_count: number }> | null)?.[0]?.member_count;
-        const memberCount = publicCount ?? memberRowCount;
-
-        let alreadyJoined = false;
-        if (userData) {
-          const { count: joinedCount } = await supabase
-            .from('pool_members')
-            .select('*', { count: 'exact', head: true })
-            .eq('pool_id', id)
-            .eq('user_id', (userData as { user_id: string }).user_id);
-          alreadyJoined = (joinedCount ?? 0) > 0;
-        }
-
-        const pool = poolData as {
-          pool_id: string;
-          pool_name: string;
-          pool_code: string;
-          description: string | null;
-          prediction_mode: string;
-          brand_name: string | null;
-          brand_emoji: string | null;
-          brand_color: string | null;
-          prediction_deadline: string | null;
-          max_participants: number | null;
-          max_entries_per_user: number;
-        };
 
         if (cancelled) return;
-        setDetail({
-          poolId: pool.pool_id,
-          poolName: pool.pool_name,
-          poolCode: pool.pool_code,
-          description: pool.description,
-          predictionMode: pool.prediction_mode,
-          brandName: pool.brand_name,
-          brandEmoji: pool.brand_emoji,
-          brandColor: pool.brand_color,
-          predictionDeadline: pool.prediction_deadline,
-          maxParticipants: pool.max_participants,
-          maxEntriesPerUser: pool.max_entries_per_user,
-          memberCount: memberCount ?? 0,
-          alreadyJoined,
+        setPool(row.is_private ? { ...card, memberCount: memberRowCount ?? 0 } : card);
+        setMeta({
+          maxParticipants: row.max_participants,
+          maxEntriesPerUser: row.max_entries_per_user,
+          isPrivate: row.is_private,
         });
-        setSettings(settingsData as PoolSettingsRow | null);
+        setAlreadyJoined((joinedRes.count ?? 0) > 0);
+        setSettings((settingsRes.data as PoolSettingsRow | null) ?? null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load pool.');
@@ -224,16 +167,16 @@ export default function PoolPreviewSheet() {
   }, [id]);
 
   async function handleJoin() {
-    if (!detail || joining) return;
+    if (!pool || joining) return;
     setJoining(true);
     try {
-      await joinPool(detail.poolCode);
+      await joinPool(pool.poolCode);
       // Refresh Home / Pools cards so the new pool appears immediately
       // when the user navigates back to those tabs later.
       void refreshHomeData();
       // Replace the discover-preview modal with the pool's leaderboard so
       // tapping back doesn't return to the modal (the user already joined).
-      router.replace(`/pool/${detail.poolId}`);
+      router.replace(`/pool/${pool.poolId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join pool.');
     } finally {
@@ -242,45 +185,19 @@ export default function PoolPreviewSheet() {
   }
 
   async function handleShare() {
-    if (!detail) return;
-    const url = `https://sportpool.io/join/${detail.poolCode}`;
-    await Share.share({
-      message: `Join my World Cup prediction pool on SportPool!\n\n${url}`,
-      url,
-    });
-  }
-
-  // Tap-to-copy the pool code. Silent-fail when Clipboard isn't linked
-  // (which only happens in tooling, not real builds). The visual feedback
-  // — pill turns green, label flips to "Copied" — is driven by codeCopied;
-  // it reverts after 2s on the same timeout the SettingsTab uses.
-  async function handleCopyCode() {
-    if (!detail || !Clipboard) return;
-    try {
-      await Clipboard.setStringAsync(detail.poolCode);
-      setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
-    } catch {
-      // Ignore — copy failure is non-critical, user can long-press text instead.
-    }
+    if (!pool) return;
+    await Share.share(shareMessage(pool));
   }
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.snow,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <View style={{ flex: 1, backgroundColor: theme.colors.snow, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
 
-  if (error || !detail) {
+  if (error || !pool || !meta) {
     return (
       <View
         style={{
@@ -311,10 +228,13 @@ export default function PoolPreviewSheet() {
     );
   }
 
-  const modeColor = MODE_COLOR[detail.predictionMode] ?? theme.colors.primary;
-  const modeLabel = MODE_LABEL[detail.predictionMode] ?? 'Pool';
-  const brandColor = brandHex(detail.brandColor);
-  const isBranded = Boolean(detail.brandName && brandColor);
+  const steps = howItWorks(pool, new Date());
+  if (meta.maxEntriesPerUser > 1) steps.push(`You can have up to ${meta.maxEntriesPerUser} entries in this pool.`);
+  if (meta.maxParticipants && meta.maxParticipants > 0) {
+    steps.push(`Open to ${meta.maxParticipants} players — ${pool.memberCount} so far.`);
+  }
+  const leagueCards = leaguePointsCards(pool, settings);
+  const isWorldCup = pool.predictionMode !== null && WORLD_CUP_MODES.has(pool.predictionMode);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
@@ -322,268 +242,82 @@ export default function PoolPreviewSheet() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: theme.spacing.xl,
-          // iOS: the modal presentation provides its own safe inset above
-          // the card, so a fixed xxl gap places the header comfortably below
-          // the rounded modal lip. Android: the modal renders edge-to-edge
-          // and inherits the system status bar — we need insets.top so the
-          // title isn't tucked behind the notch / camera cutout.
-          paddingTop:
-            Platform.OS === 'android'
-              ? insets.top + theme.spacing.md
-              : theme.spacing.xxl,
-          paddingBottom: theme.spacing.sm,
+          justifyContent: 'space-between',
+          paddingLeft: theme.spacing.xl,
+          paddingRight: theme.spacing.lg,
+          // iOS: the modal presentation provides its own safe inset above the
+          // card. Android: the modal renders edge-to-edge under the status bar.
+          paddingTop: Platform.OS === 'android' ? insets.top + theme.spacing.md : theme.spacing.lg,
+          paddingBottom: theme.spacing.xs,
         }}
       >
-        {/* Back chevron on the left — cross-platform navigation pattern.
-            Lucide ChevronLeft via our Icon component renders consistently
-            on both iOS and Android. */}
+        <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12, letterSpacing: 1.4, color: theme.colors.slate }}>
+          {meta.isPrivate ? 'POOL' : 'PUBLIC POOL'}
+        </RNText>
         <Pressable
           onPress={() => router.back()}
-          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
           style={({ pressed }) => ({
-            opacity: pressed ? 0.5 : 1,
-            width: 32,
-            alignItems: 'flex-start',
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.mist,
+            opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Icon name="chevron.left" size={24} color="ink" weight="bold" />
+          <Icon name="xmark" size={15} color="slate" weight="bold" />
         </Pressable>
-        <Text variant="cardTitle" numberOfLines={1} align="center" style={{ flex: 1 }}>
-          {detail.poolName}
-        </Text>
-        {/* Right-side spacer — matches the back button's footprint so the
-            title stays optically centered. */}
-        <View style={{ width: 32 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={{
-          padding: theme.spacing.xl,
+          paddingHorizontal: theme.spacing.xl,
+          paddingTop: theme.spacing.sm,
           paddingBottom: 120 + insets.bottom,
-          gap: theme.spacing.xl,
+          gap: theme.spacing.lg,
         }}
       >
-        <View style={{ gap: theme.spacing.sm }}>
-          {isBranded && brandColor ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {detail.brandEmoji ? <RNText style={{ fontSize: 13 }}>{detail.brandEmoji}</RNText> : null}
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 13,
-                  color: theme.colors.slate,
-                }}
-              >
-                {detail.brandName}
-              </RNText>
-            </View>
-          ) : null}
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-            <Pill label={modeLabel} color={modeColor} />
-            {detail.alreadyJoined ? <Pill label="Joined" color={theme.colors.green} /> : null}
-          </View>
-          {detail.description ? (
-            <Text variant="body" color="slate">
-              {detail.description}
-            </Text>
-          ) : null}
-        </View>
+        <DiscoverPoolCard pool={pool} variant="hero" />
 
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.lg,
-            paddingVertical: theme.spacing.xs,
-            ...theme.shadows.card,
-          }}
-        >
-          <InfoRow
-            icon="person.2.fill"
-            label="Players"
-            value={
-              detail.maxParticipants && detail.maxParticipants > 0
-                ? `${detail.memberCount} / ${detail.maxParticipants}`
-                : `${detail.memberCount}`
-            }
-          />
-          <RowDivider />
-          <InfoRow
-            icon="ticket.fill"
-            label="Entries per player"
-            value={String(detail.maxEntriesPerUser)}
-          />
-          <RowDivider />
-          <InfoRow
-            icon="clock.fill"
-            label="Deadline"
-            value={formatLongDate(detail.predictionDeadline)}
-          />
-          <RowDivider />
-          <InfoRow icon="eye.fill" label="Visibility" value="Public" />
-        </View>
-
-        <View style={{ gap: theme.spacing.md }}>
-          <Text variant="cardTitle">Share</Text>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            {/* Pool code pill — tap to copy. Swaps to a green "Copied"
-                state for 2s after a successful copy. Disabled (visually
-                identical, just no press handler) when Clipboard isn't
-                linked, which only happens in tooling. */}
-            <Pressable
-              onPress={handleCopyCode}
-              disabled={!Clipboard}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: theme.spacing.lg,
-                paddingVertical: theme.spacing.sm + 1,
-                borderRadius: theme.radii.pill,
-                backgroundColor: codeCopied
-                  ? withOpacity(theme.colors.green, 0.16)
-                  : withOpacity(theme.colors.primary, 0.08),
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Icon
-                name={codeCopied ? 'checkmark.circle.fill' : 'doc.on.clipboard'}
-                tint={codeCopied ? theme.colors.green : undefined}
-                color={codeCopied ? undefined : 'primary'}
-                size={18}
-              />
-              <RNText
-                style={{
-                  fontFamily: codeCopied
-                    ? fontFamilies.bold
-                    : Platform.OS === 'ios'
-                      ? 'Menlo-Bold'
-                      : 'monospace',
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: codeCopied ? theme.colors.green : theme.colors.primary,
-                  letterSpacing: codeCopied ? 0 : 1,
-                  // Android's text-measurement omits the trailing letter-spacing,
-                  // so the last glyph gets clipped by the parent. Match it with
-                  // a paddingRight equal to the letterSpacing value. iOS already
-                  // measures the trailing space correctly so this is Android-only.
-                  ...Platform.select({
-                    android: codeCopied ? {} : { paddingRight: 1 },
-                    default: {},
-                  }),
-                }}
-              >
-                {codeCopied ? 'Copied' : detail.poolCode}
-              </RNText>
-            </Pressable>
-            <Pressable
-              onPress={handleShare}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: theme.spacing.lg,
-                paddingVertical: theme.spacing.sm + 1,
-                borderRadius: theme.radii.pill,
-                backgroundColor: withOpacity(theme.colors.primary, 0.08),
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Icon name="square.and.arrow.up" color="primary" size={18} />
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.semibold,
-                  fontSize: 13,
-                  color: theme.colors.primary,
-                }}
-              >
-                Share
-              </RNText>
-            </Pressable>
-          </View>
-        </View>
-
-        {settings ? (
-          <View style={{ gap: theme.spacing.md }}>
-            <Text variant="cardTitle">Scoring Rules</Text>
-            <View style={{ gap: theme.spacing.md }}>
-              {detail.predictionMode === 'bracket_picker' ? (
-                // Bracket Picker mode has no per-match scoring — points come
-                // from correct group positions, third-place predictions,
-                // knockout winners, the champion pick, and (optionally)
-                // penalty calls. Mirrors the DEFAULTS in
-                // lib/bracketPickerScoring.ts. Falls back to those defaults
-                // when the admin hasn't overridden them in pool_settings.
-                <>
-                  <ScoringCard title="Group Positions">
-                    <ScoreRow label="Correct 1st Place" pts={settings.bp_group_correct_1st ?? 4} />
-                    <ScoreRow label="Correct 2nd Place" pts={settings.bp_group_correct_2nd ?? 3} />
-                    <ScoreRow label="Correct 3rd Place" pts={settings.bp_group_correct_3rd ?? 2} />
-                    <ScoreRow label="Correct 4th Place" pts={settings.bp_group_correct_4th ?? 1} />
-                  </ScoringCard>
-                  <ScoringCard title="Third-Place Qualifiers">
-                    <ScoreRow
-                      label="Correct Qualifier"
-                      pts={settings.bp_third_correct_qualifier ?? 2}
-                    />
-                    <ScoreRow
-                      label="Correct Elimination"
-                      pts={settings.bp_third_correct_eliminated ?? 1}
-                    />
-                    <ScoreRow
-                      label="All Correct Bonus"
-                      pts={settings.bp_third_all_correct_bonus ?? 10}
-                    />
-                  </ScoringCard>
-                  <ScoringCard title="Knockout Winners">
-                    <ScoreRow label="Round of 32" pts={settings.bp_r32_correct ?? 1} />
-                    <ScoreRow label="Round of 16" pts={settings.bp_r16_correct ?? 2} />
-                    <ScoreRow label="Quarter-Final" pts={settings.bp_qf_correct ?? 4} />
-                    <ScoreRow label="Semi-Final" pts={settings.bp_sf_correct ?? 8} />
-                    <ScoreRow
-                      label="Third-Place Match"
-                      pts={settings.bp_third_place_match_correct ?? 10}
-                    />
-                    <ScoreRow label="Final" pts={settings.bp_final_correct ?? 20} />
-                  </ScoringCard>
-                  <ScoringCard title="Bonus Picks">
-                    <ScoreRow label="Champion Bonus" pts={settings.bp_champion_bonus ?? 50} />
-                    <ScoreRow label="Correct Penalty Call" pts={settings.bp_penalty_correct ?? 1} />
-                  </ScoringCard>
-                </>
-              ) : (
-                // Full-tournament and progressive modes both score per-match
-                // (exact / difference / result), so they render the same
-                // three (or four with PSO) cards.
-                <>
-                  {/* A "Knockout Stage" card sat below this one reading
-                      knockout_*, which migration 042 retired. Knockout matches
-                      score off these same group values, scaled by the round
-                      multiplier — so the card was telling someone deciding
-                      whether to join a number that no longer applies. */}
-                  <ScoringCard title="Group Stage">
-                    <ScoreRow label="Exact Score" pts={settings.group_exact_score} />
-                    <ScoreRow label="Correct Difference" pts={settings.group_correct_difference} />
-                    <ScoreRow label="Correct Result" pts={settings.group_correct_result} />
-                  </ScoringCard>
-                  {settings.pso_enabled ? (
-                    <ScoringCard title="Penalty Shootout">
-                      {settings.pso_exact_score !== null ? (
-                        <ScoreRow label="Exact Score" pts={settings.pso_exact_score} />
-                      ) : null}
-                      {settings.pso_correct_difference !== null ? (
-                        <ScoreRow label="Correct Difference" pts={settings.pso_correct_difference} />
-                      ) : null}
-                      {settings.pso_correct_result !== null ? (
-                        <ScoreRow label="Correct Result" pts={settings.pso_correct_result} />
-                      ) : null}
-                    </ScoringCard>
-                  ) : null}
-                </>
-              )}
-            </View>
-          </View>
+        {steps.length ? (
+          <Section label="How it works">
+            <WhiteCard>
+              <View style={{ paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, gap: theme.spacing.md }}>
+                {steps.map((line, i) => (
+                  <View key={i} style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: withOpacity(theme.colors.primary, 0.12),
+                      }}
+                    >
+                      <RNText style={{ fontFamily: fontFamilies.black, fontSize: 12, color: theme.colors.primary }}>
+                        {i + 1}
+                      </RNText>
+                    </View>
+                    <Text variant="body" style={{ flex: 1, color: theme.colors.ink }}>
+                      {line}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </WhiteCard>
+          </Section>
         ) : null}
+
+        {leagueCards
+          ? leagueCards.map((card) => <PointsSection key={card.title} card={card} />)
+          : null}
+
+        {isWorldCup && settings ? <WorldCupScoring mode={pool.predictionMode!} settings={settings} /> : null}
       </ScrollView>
 
       <View
@@ -592,61 +326,60 @@ export default function PoolPreviewSheet() {
           bottom: 0,
           left: 0,
           right: 0,
+          flexDirection: 'row',
+          gap: theme.spacing.md,
           paddingHorizontal: theme.spacing.xl,
           paddingTop: theme.spacing.md,
           paddingBottom: theme.spacing.md + insets.bottom,
           backgroundColor: theme.colors.snow,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: -4 },
+          borderTopWidth: theme.borders.thin,
+          borderTopColor: withOpacity(theme.colors.silver, 0.4),
         }}
       >
         <Pressable
+          onPress={handleShare}
+          accessibilityRole="button"
+          accessibilityLabel="Share this pool"
+          style={({ pressed }) => ({
+            width: 54,
+            height: 54,
+            borderRadius: 27,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.mist,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Icon name="square.and.arrow.up" color="ink" size={20} weight="semibold" />
+        </Pressable>
+        <Pressable
           onPress={
-            detail.alreadyJoined
+            alreadyJoined
               ? () => {
                   router.back();
-                  setTimeout(() => router.navigate(`/pool/${detail.poolId}`), 250);
+                  setTimeout(() => router.navigate(`/pool/${pool.poolId}`), 250);
                 }
               : handleJoin
           }
           disabled={joining}
+          accessibilityRole="button"
           style={({ pressed }) => ({
-            flexDirection: 'row',
+            flex: 1,
+            height: 54,
+            borderRadius: 27,
+            borderCurve: 'continuous',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
-            height: 52,
-            borderRadius: theme.radii.md,
             backgroundColor: theme.colors.primary,
             opacity: joining ? 0.6 : pressed ? 0.85 : 1,
-            shadowColor: theme.colors.primary,
-            shadowOpacity: 0.3,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 6 },
           })}
         >
           {joining ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <>
-              <Icon
-                name={detail.alreadyJoined ? 'arrow.right.circle.fill' : 'person.badge.plus'}
-                size={20}
-                tint="#FFFFFF"
-                weight="bold"
-              />
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 16,
-                  color: '#FFFFFF',
-                }}
-              >
-                {detail.alreadyJoined ? 'Go to Pool' : 'Join Pool'}
-              </RNText>
-            </>
+            <RNText style={{ fontFamily: fontFamilies.black, fontSize: 17, color: '#FFFFFF' }}>
+              {alreadyJoined ? 'Go to pool' : 'Join pool'}
+            </RNText>
           )}
         </Pressable>
       </View>
@@ -654,123 +387,184 @@ export default function PoolPreviewSheet() {
   );
 }
 
-function Pill({ label, color }: { label: string; color: string }) {
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  const theme = useTheme();
   return (
-    <View
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        backgroundColor: withOpacity(color, 0.1),
-      }}
-    >
+    <View style={{ gap: theme.spacing.sm }}>
       <RNText
         style={{
-          fontFamily: fontFamilies.semibold,
+          fontFamily: fontFamilies.bold,
           fontSize: 12,
-          color,
-        }}
-      >
-        {label}
-      </RNText>
-    </View>
-  );
-}
-
-function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm + 2,
-      }}
-    >
-      <View style={{ width: 28, alignItems: 'center' }}>
-        <Icon name={icon as never} color="primary" size={20} />
-      </View>
-      <Text variant="body" color="slate" style={{ flex: 1 }}>
-        {label}
-      </Text>
-      <RNText
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 14,
-          color: theme.colors.ink,
-        }}
-      >
-        {value}
-      </RNText>
-    </View>
-  );
-}
-
-function RowDivider() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        height: theme.borders.thin,
-        backgroundColor: withOpacity(theme.colors.silver, 0.4),
-        marginLeft: theme.spacing.xl + 16,
-      }}
-    />
-  );
-}
-
-function ScoringCard({ title, children }: { title: string; children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-        padding: theme.spacing.lg,
-        gap: theme.spacing.sm,
-        ...theme.shadows.card,
-      }}
-    >
-      <RNText
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 13,
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
           color: theme.colors.slate,
+          paddingHorizontal: theme.spacing.xs,
         }}
       >
-        {title}
+        {label}
       </RNText>
       {children}
     </View>
   );
 }
 
-function ScoreRow({ label, pts }: { label: string; pts: number }) {
+function WhiteCard({ children }: { children: ReactNode }) {
   const theme = useTheme();
   return (
     <View
       style={{
+        backgroundColor: theme.colors.surface,
+        borderRadius: 20,
+        borderCurve: 'continuous',
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function PointsSection({ card }: { card: PointsCard }) {
+  const theme = useTheme();
+  return (
+    <Section label={card.title}>
+      <WhiteCard>
+        {card.rows.map((row, i) => (
+          <View key={row.label}>
+            {i > 0 ? (
+              <View
+                style={{
+                  height: theme.borders.thin,
+                  marginLeft: theme.spacing.lg,
+                  backgroundColor: withOpacity(theme.colors.silver, 0.4),
+                }}
+              />
+            ) : null}
+            <PointsRow label={row.label} points={row.points} />
+          </View>
+        ))}
+      </WhiteCard>
+      {card.footnote ? (
+        <Text variant="caption" color="slate" style={{ paddingHorizontal: theme.spacing.xs }}>
+          {card.footnote}
+        </Text>
+      ) : null}
+    </Section>
+  );
+}
+
+function PointsRow({ label, points }: { label: string; points: number }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        minHeight: 46,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 2,
+        gap: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
       }}
     >
-      <Text variant="body" color="slate">
-        {label}
-      </Text>
+      <RNText style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.ink }}>{label}</RNText>
       <RNText
         style={{
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: '700',
-          color: theme.colors.ink,
+          color: theme.colors.primary,
         }}
       >
-        {pts} pts
+        {points}
       </RNText>
+    </View>
+  );
+}
+
+/**
+ * The World Cup modes' scoring, as this screen always drew it — kept for a
+ * tournament pool, which is the only kind it was ever right for.
+ */
+function WorldCupScoring({ mode, settings }: { mode: string; settings: PoolSettingsRow }) {
+  const theme = useTheme();
+  const cards: PointsCard[] =
+    mode === 'bracket_picker'
+      ? // Bracket Picker mode has no per-match scoring — points come from
+        // correct group positions, third-place predictions, knockout winners,
+        // the champion pick, and (optionally) penalty calls. Mirrors the
+        // DEFAULTS in lib/bracketPickerScoring.ts, which apply when the admin
+        // hasn't overridden them in pool_settings.
+        [
+          {
+            title: 'Group positions',
+            rows: [
+              { label: 'Correct 1st place', points: settings.bp_group_correct_1st ?? 4 },
+              { label: 'Correct 2nd place', points: settings.bp_group_correct_2nd ?? 3 },
+              { label: 'Correct 3rd place', points: settings.bp_group_correct_3rd ?? 2 },
+              { label: 'Correct 4th place', points: settings.bp_group_correct_4th ?? 1 },
+            ],
+          },
+          {
+            title: 'Third-place qualifiers',
+            rows: [
+              { label: 'Correct qualifier', points: settings.bp_third_correct_qualifier ?? 2 },
+              { label: 'Correct elimination', points: settings.bp_third_correct_eliminated ?? 1 },
+              { label: 'All correct bonus', points: settings.bp_third_all_correct_bonus ?? 10 },
+            ],
+          },
+          {
+            title: 'Knockout winners',
+            rows: [
+              { label: 'Round of 32', points: settings.bp_r32_correct ?? 1 },
+              { label: 'Round of 16', points: settings.bp_r16_correct ?? 2 },
+              { label: 'Quarter-final', points: settings.bp_qf_correct ?? 4 },
+              { label: 'Semi-final', points: settings.bp_sf_correct ?? 8 },
+              { label: 'Third-place match', points: settings.bp_third_place_match_correct ?? 10 },
+              { label: 'Final', points: settings.bp_final_correct ?? 20 },
+            ],
+          },
+          {
+            title: 'Bonus picks',
+            rows: [
+              { label: 'Champion bonus', points: settings.bp_champion_bonus ?? 50 },
+              { label: 'Correct penalty call', points: settings.bp_penalty_correct ?? 1 },
+            ],
+          },
+        ]
+      : [
+          // A "Knockout Stage" card once sat here reading knockout_*, which
+          // migration 042 retired. Knockout matches score off these same group
+          // values, scaled by the round multiplier.
+          {
+            title: 'Points per match',
+            rows: [
+              { label: 'Exact score', points: settings.group_exact_score },
+              { label: 'Correct difference', points: settings.group_correct_difference },
+              { label: 'Correct result', points: settings.group_correct_result },
+            ],
+          },
+          ...(settings.pso_enabled
+            ? [
+                {
+                  title: 'Penalty shootout',
+                  rows: [
+                    ...(settings.pso_exact_score !== null ? [{ label: 'Exact score', points: settings.pso_exact_score }] : []),
+                    ...(settings.pso_correct_difference !== null
+                      ? [{ label: 'Correct difference', points: settings.pso_correct_difference }]
+                      : []),
+                    ...(settings.pso_correct_result !== null
+                      ? [{ label: 'Correct result', points: settings.pso_correct_result }]
+                      : []),
+                  ],
+                },
+              ]
+            : []),
+        ];
+  return (
+    <View style={{ gap: theme.spacing.lg }}>
+      {cards.map((card) => (
+        <PointsSection key={card.title} card={card} />
+      ))}
     </View>
   );
 }

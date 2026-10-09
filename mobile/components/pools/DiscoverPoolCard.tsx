@@ -18,6 +18,11 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 type DiscoverPoolCardProps = {
   pool: DiscoverPool;
   onPress?: () => void;
+  /**
+   * 'hero' is the same card at the top of the pool preview — not a button, no
+   * chevron, a bigger name. Preview A is "card A, grown up", so it is card A.
+   */
+  variant?: 'list' | 'hero';
 };
 
 // =============================================================
@@ -42,8 +47,9 @@ function brandHex(hex: string | null): string | null {
   return hex.startsWith('#') ? hex : `#${hex}`;
 }
 
-export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
+export function DiscoverPoolCard({ pool, onPress, variant = 'list' }: DiscoverPoolCardProps) {
   const theme = useTheme();
+  const isHero = variant === 'hero';
   const isDark = theme.mode === 'dark';
   const brandColor = brandHex(pool.brandColor);
   const isBranded = Boolean(pool.brandName && brandColor);
@@ -62,21 +68,18 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   const since = formatSince(pool.createdAt);
   const footer = pool.adminName ? `Run by ${pool.adminName} · since ${since}` : `Since ${since}`;
 
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${pool.poolName}, ${modeLabel}, ${pool.memberCount} ${pool.memberCount === 1 ? 'player' : 'players'}`}
-      style={({ pressed }) => ({
-        backgroundColor: isBranded && brandColor ? withOpacity(brandColor, 0.05) : theme.colors.surface,
-        borderRadius: theme.radii.lg,
-        borderCurve: 'continuous',
-        overflow: 'hidden',
-        flexDirection: 'row',
-        opacity: pressed ? 0.85 : 1,
-        ...theme.shadows.card,
-      })}
-    >
+  const cardStyle = {
+    backgroundColor: isBranded && brandColor ? withOpacity(brandColor, 0.05) : theme.colors.surface,
+    borderRadius: theme.radii.lg,
+    borderCurve: 'continuous' as const,
+    overflow: 'hidden' as const,
+    flexDirection: 'row' as const,
+    ...theme.shadows.card,
+  };
+  const a11yLabel = `${pool.poolName}, ${modeLabel}, ${pool.memberCount} ${pool.memberCount === 1 ? 'player' : 'players'}`;
+
+  const body = (
+    <>
       {/* The competition, named down the side — as on the My Pools card. A
           branded pool shows its banner instead; one identity per card. */}
       {!isBranded ? (
@@ -113,12 +116,18 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
         <View style={{ padding: theme.spacing.md, gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
             <Text
-              numberOfLines={1}
-              style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 18, lineHeight: 24, color: theme.colors.ink }}
+              numberOfLines={isHero ? 2 : 1}
+              style={{
+                flex: 1,
+                fontFamily: isHero ? fontFamilies.black : fontFamilies.bold,
+                fontSize: isHero ? 22 : 18,
+                lineHeight: isHero ? 28 : 24,
+                color: theme.colors.ink,
+              }}
             >
               {pool.poolName}
             </Text>
-            <Icon name="chevron.right" color="slate" size={14} weight="semibold" />
+            {isHero ? null : <Icon name="chevron.right" color="slate" size={14} weight="semibold" />}
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.xs }}>
@@ -179,6 +188,24 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
           </Text>
         </View>
       </View>
+    </>
+  );
+
+  if (isHero) {
+    return (
+      <View accessible accessibilityLabel={a11yLabel} style={cardStyle}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      style={({ pressed }) => ({ ...cardStyle, opacity: pressed ? 0.85 : 1 })}
+    >
+      {body}
     </Pressable>
   );
 }
