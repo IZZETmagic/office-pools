@@ -54,9 +54,36 @@ export type RevealResult =
 const LOCKED_ROUND_STATES = new Set(['locked', 'in_progress', 'completed'])
 
 /**
+ * May this caller read other members' picks BEFORE they are revealed?
+ *
+ * ⚠⚠ NOT IN A LEAGUE POOL, ADMIN OR NOT — Ryan, 2026-10-09. The World Cup rule
+ * was "pool admins see everything", mirroring the RLS admin-read policy on
+ * `predictions`. In a league pool that rule hands the admin a rival's sheet
+ * before lock: every league pool has exactly one admin and that admin PLAYS it,
+ * so in Showdown they could read their own opponent's picks the night before
+ * the duel (DDWRW6SU, matchweek 6: all twelve sheets, a day early).
+ *
+ * A super admin viewing a pool they have NOT joined keeps full read — they are
+ * not playing it, and support work needs the whole entry. World Cup pools keep
+ * the admin rule unchanged.
+ *
+ * The entry's OWNER is not this function's question: own picks are always
+ * readable, and both callers handle that before asking.
+ */
+export function bypassesRevealGate(caller: {
+  isLeague: boolean
+  isPoolAdmin: boolean
+  isSuperAdminViewing: boolean
+}): boolean {
+  if (caller.isSuperAdminViewing) return true
+  return caller.isPoolAdmin && !caller.isLeague
+}
+
+/**
  * Decide which of an entry's predictions are revealable to OTHER pool members
- * as of `now`. Do NOT call this for the entry's owner (or a pool admin) — those
- * callers may always read in full and should short-circuit before this gate.
+ * as of `now`. Do NOT call this for the entry's owner (or a caller that
+ * `bypassesRevealGate` lets through) — those callers may always read in full
+ * and should short-circuit before this gate.
  */
 export function computeReveal(
   pool: RevealPool,
@@ -132,8 +159,8 @@ export function filterRevealedPredictions<T extends { match_id: string }>(
  * app/pools/[pool_id]/page.tsx when the array stopped riding along on pool open
  * (drafts/2026-07-29_leaderboard_precomputed_handoff.md, step 3).
  *
- * `isAdmin` short-circuits: pool admins already have full visibility through the
- * RLS admin-read policy and the per-entry view route.
+ * `isAdmin` short-circuits. Pass `bypassesRevealGate(...)`, never a bare role
+ * check — a league pool's admin does NOT get to skip this.
  */
 export function gatePoolPredictions<T extends { match_id: string; entry_id: string }>(params: {
   predictions: T[]

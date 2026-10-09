@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { getPoolBulkData } from '@/lib/poolData'
 import { readAllLeaguePredictions, readLeagueRevealContext } from '@/lib/league/read'
-import { computeReveal, gatePoolPredictions, type PredictionMode } from '@/lib/predictions/revealGate'
+import { bypassesRevealGate, computeReveal, gatePoolPredictions, type PredictionMode } from '@/lib/predictions/revealGate'
 import type { PredictionData, MatchScoreNarrow } from '@/app/pools/[pool_id]/types'
 
 // =============================================================
@@ -62,7 +62,6 @@ async function handleGET(
   if (!membership && !isSuperAdminViewing) {
     return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
   }
-  const isAdmin = isSuperAdminViewing || membership!.role === 'admin'
 
   const admin = createAdminClient()
 
@@ -106,9 +105,16 @@ async function handleGET(
     allOutcomes = outcomes
   }
 
-  // Admins see everything (matches the RLS admin-read policy and the per-entry
-  // view route). Everyone else: own entries always, others only once revealable.
-  if (isAdmin) {
+  // Own entries always; everyone else's only once revealable — unless the
+  // caller bypasses the gate. ⚠ A LEAGUE pool's admin does not: they play the
+  // pool too, and before 2026-10-09 this branch handed a Showdown admin their
+  // opponent's sheet a day before the duel. See `bypassesRevealGate`.
+  const seesEverything = bypassesRevealGate({
+    isLeague: leagueSeasonId !== null,
+    isPoolAdmin: membership?.role === 'admin',
+    isSuperAdminViewing,
+  })
+  if (seesEverything) {
     return NextResponse.json({
       predictions: allPredictions, matchScores,
       ...(leagueSeasonId ? { outcomes: allOutcomes } : {}),
@@ -163,7 +169,7 @@ async function handleGET(
   const predictions = gatePoolPredictions({
     predictions: allPredictions,
     ownEntryIds: ownIds,
-    isAdmin: false, // the admin case returned above
+    isAdmin: false, // the bypass case returned above
     reveal,
     matchStageById,
   })

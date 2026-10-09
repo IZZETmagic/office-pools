@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  bypassesRevealGate,
   gatePoolPredictions,
   computeReveal,
   filterRevealedPredictions,
@@ -308,6 +309,51 @@ describe('computeReveal — league_pickem', () => {
     expect(shown).toHaveLength(3)
     expect(shown.filter((o) => o.entry_id === 'theirs')).toEqual([
       { entry_id: 'theirs', match_id: 'fx1', outcome: 'draw' },
+    ])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// bypassesRevealGate — who may read other members' picks before the reveal.
+// Ryan, 2026-10-09: a league pool's admin plays it, so they get no head start.
+// ---------------------------------------------------------------------------
+describe('bypassesRevealGate', () => {
+  it("refuses a league pool's admin — they play the pool", () => {
+    expect(bypassesRevealGate({ isLeague: true, isPoolAdmin: true, isSuperAdminViewing: false })).toBe(false)
+  })
+
+  it("keeps the World Cup admin rule", () => {
+    expect(bypassesRevealGate({ isLeague: false, isPoolAdmin: true, isSuperAdminViewing: false })).toBe(true)
+  })
+
+  it('refuses an ordinary member either way', () => {
+    expect(bypassesRevealGate({ isLeague: true, isPoolAdmin: false, isSuperAdminViewing: false })).toBe(false)
+    expect(bypassesRevealGate({ isLeague: false, isPoolAdmin: false, isSuperAdminViewing: false })).toBe(false)
+  })
+
+  it('lets a super admin who has NOT joined the pool read it whole', () => {
+    expect(bypassesRevealGate({ isLeague: true, isPoolAdmin: false, isSuperAdminViewing: true })).toBe(true)
+  })
+
+  it("end to end: a league admin's view of an open matchweek holds only their own picks", () => {
+    const reveal = computeReveal(LEAGUE_POOL, [
+      { round_key: 'mw_5', state: null, deadline: PAST },
+      { round_key: 'mw_6', state: null, deadline: FUTURE },
+    ], NOW)
+    const shown = gatePoolPredictions({
+      predictions: [
+        { entry_id: 'admin', match_id: 'fx6' },
+        { entry_id: 'rival', match_id: 'fx5' },
+        { entry_id: 'rival', match_id: 'fx6' },
+      ],
+      ownEntryIds: ['admin'],
+      isAdmin: bypassesRevealGate({ isLeague: true, isPoolAdmin: true, isSuperAdminViewing: false }),
+      reveal,
+      matchStageById: new Map([['fx5', 'mw_5'], ['fx6', 'mw_6']]),
+    })
+    expect(shown).toEqual([
+      { entry_id: 'admin', match_id: 'fx6' },
+      { entry_id: 'rival', match_id: 'fx5' },
     ])
   })
 })

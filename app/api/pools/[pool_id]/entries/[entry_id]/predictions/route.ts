@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { readAllLeaguePredictions, readLeagueRevealContext } from '@/lib/league/read'
 import {
+  bypassesRevealGate,
   computeReveal,
   filterRevealedPredictions,
   type PredictionMode,
@@ -24,8 +25,9 @@ import {
 //   * a non-owner, non-admin caller only receives picks for scopes that are
 //     LOCKED pool-wide (see lib/predictions/revealGate) — otherwise 403
 //     { locked: true }. Nothing editable is ever revealed.
-//   * the entry's OWNER, and pool ADMINS, may always read in full (admins
-//     already have this via the existing admin replay + RLS admin-read policy).
+//   * the entry's OWNER may always read in full; so may a pool ADMIN, but in a
+//     World Cup pool only. ⚠ A LEAGUE pool's admin goes through the gate like
+//     everyone else (2026-10-09) — they play the pool. See `bypassesRevealGate`.
 //
 // Reads use the service-role client AFTER these checks — the route logic is the
 // gate, so this does not depend on (nor is it loosened by) row-level security.
@@ -100,8 +102,8 @@ async function handleGET(
   const isOwnEntry = entry.member_id === membership.member_id
   const isPoolAdmin = membership.role === 'admin'
 
-  // 5. Reveal gate. Owner + pool admins bypass it (they may always read in
-  //    full); every other member only sees scopes that are locked pool-wide.
+  // 5. Reveal gate. The owner bypasses it, and so does a World Cup pool's
+  //    admin; every other caller only sees scopes that are locked pool-wide.
   const adminClient = createAdminClient()
   const mode = pool.prediction_mode as PredictionMode
 
@@ -125,8 +127,12 @@ async function handleGET(
     roundStates = (data ?? []) as RevealRoundState[]
   }
 
+  const seesEverything =
+    isOwnEntry ||
+    bypassesRevealGate({ isLeague: leagueSeasonId !== null, isPoolAdmin, isSuperAdminViewing: false })
+
   const reveal: RevealResult =
-    isOwnEntry || isPoolAdmin
+    seesEverything
       ? { revealed: true, scope: 'all' }
       : computeReveal(
           { prediction_mode: mode, prediction_deadline: pool.prediction_deadline },
