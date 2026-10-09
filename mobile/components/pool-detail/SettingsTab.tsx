@@ -3,14 +3,13 @@ import {
   Alert,
   Modal,
   Platform,
-  Pressable,
   Text as RNText,
   TextInput,
   View,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import { router } from 'expo-router';
 
 import {

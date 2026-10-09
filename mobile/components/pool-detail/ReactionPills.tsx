@@ -1,6 +1,7 @@
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import type { ReactionAggregate } from '@/lib/usePoolBanter';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {

@@ -1,13 +1,12 @@
 import { Image } from 'expo-image';
 
-import { ClubBar } from '@/components/ui';
+import { ClubBar, Pressable } from '@/components/ui';
 import { clubColorFromCrestUrl, clubIdFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus';
 import { displayTeamName } from '@/lib/teamNames';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -237,10 +236,7 @@ export function MatchResultRow({ match, onPress }: Props) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

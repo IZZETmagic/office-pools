@@ -9,7 +9,6 @@ import {
   Animated,
   Easing,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -19,7 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS, useSheetHeight } from '@/components/ui';
+import { Icon, SHEET_RADIUS, useSheetHeight, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // One person who reacted, pre-resolved by the caller (BanterSheet owns the

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { useTheme } from '@/theme';

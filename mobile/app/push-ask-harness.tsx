@@ -13,11 +13,11 @@
 
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Alert, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PushAskSheet } from '@/components/notifications';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import type { PushAskMode } from '@/lib/pushAsk';
 import { resetPushAsk, setPushAskPreview, usePushAskPreview } from '@/lib/usePushAsk';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

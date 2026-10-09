@@ -5,10 +5,9 @@
 // `tone="danger"` recolours the tile + title red for Sign Out / Delete Account
 // rather than those growing their own component again.
 
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
-import { hapticCardTap } from '@/lib/haptics';
+import { Icon, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme } from '@/theme';
 
 export function SettingsRow({
@@ -34,10 +33,7 @@ export function SettingsRow({
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

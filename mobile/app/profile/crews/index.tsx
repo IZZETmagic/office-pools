@@ -11,13 +11,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/crews/bits';
 import { CrewFaceStack } from '@/components/crews/CrewFace';
 import { SettingsHeader } from '@/components/settings';
-import { Icon, PromptDialog } from '@/components/ui';
+import { Icon, PromptDialog, Pressable } from '@/components/ui';
 import { createCrew } from '@/lib/api';
 import { crewStatusText, crewSummary, leaderText, meText, type CrewCard } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';

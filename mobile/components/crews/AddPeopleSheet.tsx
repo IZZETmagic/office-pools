@@ -18,10 +18,10 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, useSheetChrome } from '@/components/ui';
+import { Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { inviteToCrew, lookupUsername } from '@/lib/api';
 import { invitePreviewText, personName, type Person } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';

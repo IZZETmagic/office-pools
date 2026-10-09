@@ -1,9 +1,9 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Icon, Input, Text, Wordmark } from '@/components/ui';
+import { Button, Icon, Input, Text, Wordmark, Pressable } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useTheme, withOpacity } from '@/theme';
 

@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -13,7 +12,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
 import { badgeIcon, type BadgeIconSpec } from './badge-icons';
-import { Icon, NotificationDot, Text } from '@/components/ui';
+import { Icon, NotificationDot, Text, Pressable } from '@/components/ui';
 import type {
   AnalyticsResponse,
   AnalyticsStreakData,

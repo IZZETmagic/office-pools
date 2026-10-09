@@ -6,7 +6,6 @@ import {
   Image,
   Keyboard,
   Platform,
-  Pressable,
   ScrollView,
   TextInput,
   Text as RNText,
@@ -43,7 +42,7 @@ import {
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { hapticLongPress } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import {
   fetchLeaderboard,
   type BadgeInfo,

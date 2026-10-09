@@ -40,7 +40,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Animated, {
   Easing,
@@ -50,7 +50,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { duelResult } from '@/lib/duelPoints';

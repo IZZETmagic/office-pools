@@ -4,10 +4,10 @@
 // detail screens still do — deliberately not retrofitted here).
 
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 
 export function SettingsHeader({ title }: { title: string }) {

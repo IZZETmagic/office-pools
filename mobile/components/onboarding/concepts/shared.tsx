@@ -21,7 +21,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Pressable,
   ScrollView,
   View,
   Text as RNText,
@@ -41,7 +40,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SvgXml } from 'react-native-svg';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import {
   composeAvatar,
   headOnly,

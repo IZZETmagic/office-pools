@@ -10,9 +10,9 @@
 // pool looks exactly as it did.
 
 import { router } from 'expo-router';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { personName } from '@/lib/crews';
 import { usePoolCrew } from '@/lib/useCrews';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

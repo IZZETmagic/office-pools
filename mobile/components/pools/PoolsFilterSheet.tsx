@@ -15,10 +15,10 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, useSheetChrome } from '@/components/ui';
+import { Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type FilterOption = {

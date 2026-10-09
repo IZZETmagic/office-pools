@@ -1,7 +1,6 @@
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
-import { hapticCardTap } from '@/lib/haptics';
+import { Icon, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -39,10 +38,7 @@ export function HubTile({
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       disabled={soon}
       accessibilityRole={soon ? undefined : 'button'}
       accessibilityLabel={soon ? `${title}, coming soon` : chip ? `${title}, ${chip.toLowerCase()}` : title}

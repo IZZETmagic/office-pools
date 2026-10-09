@@ -30,7 +30,7 @@
 
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Modal, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -38,7 +38,7 @@ import { PracticeScoutSheet } from '@/components/onboarding/PracticeScoutSheet';
 import { LeaderboardRow } from '@/components/pool-detail/LeaderboardRow';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
 import { hapticSuccess, hapticWarning } from '@/lib/haptics';
-import { Button, Icon, Text } from '@/components/ui';
+import { Button, Icon, Text, Pressable } from '@/components/ui';
 import type { LeaderboardEntry } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { crestUrl, PRACTICE_CREW, PRACTICE_MATCHWEEK, POINTS_PER_CORRECT, type PracticeFixture } from '@/lib/onboarding/practiceMatchweek';
@@ -213,7 +213,7 @@ function Intro({ onNext }: { onNext: () => void }) {
         </View>
       </View>
       <Footer>
-        <Button title="Give me the fixtures" size="lg" fullWidth haptic="press" onPress={onNext} />
+        <Button title="Give me the fixtures" size="lg" fullWidth onPress={onNext} />
         <Text variant="detail" color="slate" align="center">No account. Nothing saved yet.</Text>
       </Footer>
     </>
@@ -398,7 +398,7 @@ function ResultsStep({
           points · exact scorelines would have been worth more
         </Text>
       </ScrollView>
-      <Footer><Button title="Where did I finish?" size="lg" fullWidth haptic="press" onPress={onNext} /></Footer>
+      <Footer><Button title="Where did I finish?" size="lg" fullWidth onPress={onNext} /></Footer>
     </>
   );
 }
@@ -460,7 +460,7 @@ function BoardStep({
         </Text>
       </ScrollView>
       <Footer>
-        <Button title={faced ? 'Next' : 'Next'} size="lg" fullWidth haptic="press" onPress={onNext} />
+        <Button title={faced ? 'Next' : 'Next'} size="lg" fullWidth onPress={onNext} />
       </Footer>
     </>
   );
@@ -513,7 +513,7 @@ function AskStep({ name, onBuild, onSkip }: { name: string; onBuild: () => void;
         </View>
       </View>
       <Footer>
-        <Button title="Make mine" size="lg" fullWidth haptic="press" onPress={onBuild} />
+        <Button title="Make mine" size="lg" fullWidth onPress={onBuild} />
         <Pressable onPress={onSkip} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
           <Text variant="cardTitle" color="slate">Keep my initials</Text>
         </Pressable>
@@ -583,7 +583,7 @@ function TrialStep({ onNext }: { onNext: () => void }) {
         </View>
       </ScrollView>
       <Footer>
-        <Button title="Start the five weeks" size="lg" fullWidth haptic="press" onPress={onNext} />
+        <Button title="Start the five weeks" size="lg" fullWidth onPress={onNext} />
         <Pressable onPress={onNext} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
           <Text variant="cardTitle" color="slate">No thanks</Text>
         </Pressable>
@@ -610,7 +610,7 @@ function AlertsStep({ onAsk, onSkip }: { onAsk: () => void; onSkip: () => void }
       </View>
       <SafeAreaView edges={['bottom']}>
         <View style={{ paddingHorizontal: theme.spacing.xl, paddingBottom: theme.spacing.lg, gap: theme.spacing.sm }}>
-          <Button title="Send me these" size="lg" fullWidth haptic="press" onPress={onAsk} />
+          <Button title="Send me these" size="lg" fullWidth onPress={onAsk} />
           <Pressable onPress={onSkip} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', paddingVertical: theme.spacing.md, opacity: pressed ? 0.6 : 1 })}>
             <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 16, color: '#FFFFFF99' }}>Not now</RNText>
           </Pressable>
@@ -652,7 +652,7 @@ function DoneStep({ granted, onRestart }: { granted: boolean | null; onRestart: 
           </View>
         ))}
       </ScrollView>
-      <Footer><Button title="Run it again" size="lg" variant="secondary" fullWidth haptic="press" onPress={onRestart} /></Footer>
+      <Footer><Button title="Run it again" size="lg" variant="secondary" fullWidth onPress={onRestart} /></Footer>
     </>
   );
 }

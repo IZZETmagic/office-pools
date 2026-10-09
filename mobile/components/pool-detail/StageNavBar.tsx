@@ -1,7 +1,7 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export const WIZARD_STAGES = [

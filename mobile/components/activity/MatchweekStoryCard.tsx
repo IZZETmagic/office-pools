@@ -5,11 +5,10 @@
 // week happened on — the picks, the duel, or the survivor wall.
 
 import { useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import type { ActivityItem, MatchweekStoryMeta } from '@/lib/useActivity';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { relativeTime } from './ActivityCard';
@@ -55,7 +54,6 @@ export function MatchweekStoryCard({
   return (
     <Pressable
       onPress={() => {
-        hapticCardTap();
         if (hasDetail) setOpen((o) => !o);
         else onOpen?.();
       }}
@@ -178,7 +176,6 @@ export function MatchweekStoryCard({
         {onOpen ? (
           <Pressable
             onPress={() => {
-              hapticCardTap();
               onOpen();
             }}
             hitSlop={10}

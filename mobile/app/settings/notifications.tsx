@@ -3,7 +3,7 @@
 // dedicated page instead of three scrolled-past sections.
 
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -15,7 +15,7 @@ import {
   SettingsHeader,
   type NotificationOption,
 } from '@/components/settings';
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import {
   fetchNotificationPrefs,
   fetchPushPrefs,

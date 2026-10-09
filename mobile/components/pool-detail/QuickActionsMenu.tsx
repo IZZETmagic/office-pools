@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text as RNText, View } from 'react-native';
+import { Animated, Text as RNText, View } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type QuickAction = {

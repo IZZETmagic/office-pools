@@ -1,10 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Image, Platform, Text as RNText, View } from 'react-native';
 
 import { getLiveClock } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
+import { Pressable } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 
 type LiveMatchCardProps = {
@@ -18,10 +18,7 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
     >
       <LinearGradient

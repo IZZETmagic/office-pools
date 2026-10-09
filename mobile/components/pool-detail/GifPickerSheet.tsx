@@ -20,7 +20,6 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  Pressable,
   Text as RNText,
   TextInput,
   View,
@@ -28,7 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import {
   KLIPY_SEARCH_PLACEHOLDER,
   klipyCustomerId,

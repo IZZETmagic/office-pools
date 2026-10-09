@@ -16,12 +16,12 @@
 // nothing here to disclose.
 
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
-import { Button, Text } from '@/components/ui';
+import { Button, Text, Pressable } from '@/components/ui';
 import type { StoredAvatarBuild } from '@/lib/avatar/storedConfig';
 import { useAvatarAssets } from '@/lib/useAvatarAssets';
 import { useTheme, withOpacity } from '@/theme';

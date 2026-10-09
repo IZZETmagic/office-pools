@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   Text as RNText,
   TextInput,
   StyleSheet,
@@ -21,7 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Pressable } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

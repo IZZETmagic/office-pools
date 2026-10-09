@@ -1,15 +1,14 @@
 import { Fragment } from 'react';
-import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNText, View } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Platform, Share, Text as RNText, View } from 'react-native';
 
 import { CompetitionRail } from '@/components/CompetitionRail';
-import { Icon, ProgressRing, Text } from '@/components/ui';
+import { Icon, ProgressRing, Text, Pressable } from '@/components/ui';
 import { getCompetitionColor } from '@/lib/design/competition';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
 import { poolCardBlocks, type PoolCardBlock } from '@/lib/poolCardBlocks';
 import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { PoolSummary } from '@/lib/useHomeData';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // ⚠ MODE_LABEL AND MODE_GRADIENT ARE GONE, and neither was merely plainer than
@@ -153,10 +152,7 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       onLongPress={showContextMenu}
       delayLongPress={350}
       style={({ pressed }) => ({

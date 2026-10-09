@@ -22,10 +22,10 @@
 // temporarily dropping a button into the Profile tab.
 
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { C1TwoDoors } from '@/components/onboarding/concepts/C1TwoDoors';
 import { C2FaceFirst } from '@/components/onboarding/concepts/C2FaceFirst';
 import { C3LivePreview } from '@/components/onboarding/concepts/C3LivePreview';

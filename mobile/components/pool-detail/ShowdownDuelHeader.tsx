@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, Share, useWindowDimensions, View, type TextStyle } from 'react-native';
+import { Share, useWindowDimensions, View, type TextStyle } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -11,7 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
-import { CountdownText, Icon, Text } from '@/components/ui';
+import { CountdownText, Icon, Text, Pressable } from '@/components/ui';
 import {
   getInitials,
   gradientForUser,

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -14,7 +14,7 @@ import {
   WIZARD_STAGES,
   type WizardStage,
 } from '@/components/pool-detail';
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
   GROUP_LETTERS,

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import { Jersey } from '@/components/match/Jersey';
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
@@ -12,7 +12,7 @@ import {
   VIEW_L,
   VIEW_W,
 } from '@/components/match/PitchMarkings';
-import { ClubBar, Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text, Pressable } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { CHIP, groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
 import {

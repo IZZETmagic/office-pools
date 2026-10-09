@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { lastLockedWeek, ownWeekState, type OwnWeekState } from '@/lib/pickemWeek';

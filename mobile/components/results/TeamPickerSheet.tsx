@@ -4,7 +4,6 @@ import {
   Easing,
   FlatList,
   Modal,
-  Pressable,
   Text as RNText,
   TextInput,
   useWindowDimensions,
@@ -12,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS, TeamMark } from '@/components/ui';
+import { Icon, SHEET_RADIUS, TeamMark, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type TeamOption = {

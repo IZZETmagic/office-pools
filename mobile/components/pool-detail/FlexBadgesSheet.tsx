@@ -4,10 +4,10 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
-import { Image, Pressable, Text as RNText, View } from 'react-native';
+import { Image, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useSheetChrome } from '@/components/ui';
+import { useSheetChrome, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { badgeIcon } from './badge-icons';

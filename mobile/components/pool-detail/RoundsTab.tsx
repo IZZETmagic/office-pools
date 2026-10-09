@@ -4,12 +4,11 @@ import {
   Alert,
   Modal,
   Platform,
-  Pressable,
   Text as RNText,
   View,
 } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import {
   changeRoundState,
   type ChangeRoundStateAction,

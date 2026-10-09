@@ -58,7 +58,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect } from 'react';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -71,7 +71,7 @@ import Animated, {
 import Svg, { Defs, Line, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import {

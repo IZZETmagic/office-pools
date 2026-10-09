@@ -4,11 +4,11 @@
 // ⚠ It opens the chat, not the message. The sheet has no scroll-to-message
 // yet; a mention is almost always recent, so it is on the first screen anyway.
 
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import { avatarBackgroundFor, avatarIndexFor, groundInkFor } from '@/lib/avatarGradient';
 import type { ActivityItem, MentionMeta } from '@/lib/useActivity';
-import { hapticCardTap } from '@/lib/haptics';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { relativeTime } from './ActivityCard';
@@ -31,7 +31,6 @@ export function MentionCard({ item, onPress }: { item: ActivityItem; onPress: ((
       onPress={
         onPress
           ? () => {
-              hapticCardTap();
               onPress();
             }
           : undefined

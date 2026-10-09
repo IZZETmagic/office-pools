@@ -5,7 +5,7 @@
 // taps "Turn on" — "Maybe later" exits without burning that one-shot.
 
 import { useCallback, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -16,7 +16,7 @@ import {
   Notification01Icon,
 } from '@hugeicons/core-free-icons';
 
-import { Button, Text } from '@/components/ui';
+import { Button, Text, Pressable } from '@/components/ui';
 import { markNotificationsPrompted } from '@/lib/useOnboardingProgress';
 import { usePushPermission } from '@/lib/usePushPermission';
 import { hapticSuccess, hapticWarning } from '@/lib/haptics';

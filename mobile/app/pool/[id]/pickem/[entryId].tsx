@@ -2,12 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MatchScoutSheet } from '@/components/scouting/MatchScoutSheet';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
-import { ClubBar } from '@/components/ui';
+import { ClubBar, Pressable } from '@/components/ui';
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
 import { saveLeaguePicks, type LeaguePickBody } from '@/lib/api';
@@ -522,6 +522,7 @@ function WeekArrow({ icon, onPress, enabled }: { icon: string; onPress: () => vo
   const theme = useTheme();
   return (
     <Pressable
+      haptic={false}
       /*
         ⚠ A PRESS, NOT A SELECTION. Stepping the matchweek reloads the whole
         fixture list — it is the same class of move as a bottom-nav tab, not the

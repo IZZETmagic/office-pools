@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Share, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, Share, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { joinPool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';

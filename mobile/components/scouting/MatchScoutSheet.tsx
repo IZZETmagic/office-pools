@@ -1,9 +1,9 @@
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 
 import { ScoutReport } from '@/components/scouting/ScoutReport';
 import { ScoutSheet, ScoutSheetBody } from '@/components/scouting/ScoutSheet';
 import { FixtureSubject, ScoutHeader } from '@/components/scouting/kit';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { useMatchScout } from '@/lib/useMatchScout';
 import { fontFamilies, useTheme } from '@/theme';
 

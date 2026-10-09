@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -21,7 +21,7 @@ import {
   type PoolCreateJoinSheetHandle,
   PoolsHeader,
 } from '@/components/pools';
-import { Button, Icon, Text } from '@/components/ui';
+import { Button, Icon, Text, Pressable } from '@/components/ui';
 import { useSharedActivity } from '@/lib/ActivityProvider';
 import { groupByDay, matchesFilter, shouldFillMore, type ActivityFilter } from '@/lib/activityFilters';
 import {

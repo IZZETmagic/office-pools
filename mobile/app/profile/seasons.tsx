@@ -17,11 +17,11 @@
 // they have their own row in settings.
 
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsHeader } from '@/components/settings';
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
 import {
   groupByMode,

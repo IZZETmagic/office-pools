@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   Modal,
-  Pressable,
   ScrollView,
   Text as RNText,
   useWindowDimensions,
@@ -12,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Pressable } from '@/components/ui';
 import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

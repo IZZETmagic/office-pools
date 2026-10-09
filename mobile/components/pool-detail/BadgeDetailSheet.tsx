@@ -5,7 +5,6 @@ import {
   Image,
   Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text as RNText,
   useWindowDimensions,
@@ -13,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Pressable } from '@/components/ui';
 import type { BadgeInfo } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

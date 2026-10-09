@@ -18,10 +18,10 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, useSheetChrome } from '@/components/ui';
+import { Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { saveCrewFromPool } from '@/lib/api';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

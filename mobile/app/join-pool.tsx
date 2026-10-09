@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Icon, Input, Text } from '@/components/ui';
+import { Button, Icon, Input, Text, Pressable } from '@/components/ui';
 import { joinPool } from '@/lib/api';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

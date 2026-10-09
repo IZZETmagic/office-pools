@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   Text as RNText,
@@ -35,7 +34,7 @@ import {
   type GroupOption,
   type TeamOption,
 } from '@/components/results';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 // useTournamentMatches now comes from the shared provider mounted at root
 // (lib/TournamentMatchesProvider.tsx) so first-visit Results renders with

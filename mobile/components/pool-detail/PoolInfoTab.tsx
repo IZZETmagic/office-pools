@@ -17,9 +17,9 @@
 
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import { leavePool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useMemberRoster } from '@/lib/useMemberRoster';

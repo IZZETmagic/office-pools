@@ -1,6 +1,6 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type PoolsTab = 'my-pools' | 'discover';

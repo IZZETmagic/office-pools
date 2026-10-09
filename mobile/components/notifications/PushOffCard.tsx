@@ -3,11 +3,10 @@
 // and closes for good with its ×. Deliberately NOT a Needs-you card: no primary border, and above
 // that heading rather than in it — an open decision about a pool is not the same thing as a setting.
 
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import type { PushAskMode } from '@/lib/pushAsk';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export function PushOffCard({
@@ -73,7 +72,6 @@ export function PushOffCard({
         {/* The Needs-you card's own button, so the two read as one system. */}
         <Pressable
           onPress={() => {
-            hapticCardTap();
             onTurnOn();
           }}
           hitSlop={6}

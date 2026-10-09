@@ -17,7 +17,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   RefreshControl,
   ScrollView,
   Text as RNText,
@@ -33,6 +32,7 @@ import { badgeSource, formatBadgeName, type BadgeTally, type Podium } from '@/li
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePodium } from '@/lib/usePodium';
 import { useTrophies } from '@/lib/useTrophies';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export default function TrophyRoomScreen() {

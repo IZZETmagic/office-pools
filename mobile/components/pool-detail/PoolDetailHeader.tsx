@@ -1,9 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Image, Pressable, Share, Text as RNText, View } from 'react-native';
+import { Image, Share, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -11,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GroupCollapsibleSection, MatchPredictionRow, ThirdPlaceTable } from '@/components/pool-detail';
 import { usePoolSettings } from '@/lib/usePoolSettings';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
   GROUP_LETTERS,

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Animated, Easing, Platform, Text as RNText, View } from 'react-native';
 
 import { hapticSelection, hapticWarning } from '@/lib/haptics';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -73,6 +74,9 @@ export function TapScoreField({ value, onChange, disabled, width = 48 }: Props) 
 
   return (
     <Pressable
+      // ⚠ Two feels of its own — a tick to increment, a warning rhythm to
+      // reset — so the wrapper must add neither.
+      haptic={false}
       onPress={tap}
       onLongPress={longPressReset}
       disabled={disabled}

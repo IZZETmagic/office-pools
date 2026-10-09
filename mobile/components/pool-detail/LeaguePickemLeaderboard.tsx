@@ -1,9 +1,9 @@
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
 import { LeagueFormLegend } from './LeaderboardLegend';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { FormDots, MovementPill, rankColor } from './leaderboard-shared';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

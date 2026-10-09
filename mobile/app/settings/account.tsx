@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Pressable,
   ScrollView,
   Text as RNText,
   TextInput,
@@ -29,7 +28,7 @@ import {
   SettingsHeader,
   SettingsRow,
 } from '@/components/settings';
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { deleteAccount } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';

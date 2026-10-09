@@ -65,9 +65,9 @@
 // would show the member a fabricated *"you predicted 1-0"* they never picked.
 // =============================================================
 
-import { Pressable, Text as RNText, View } from 'react-native'
+import { Text as RNText, View } from 'react-native'
 
-import { ClubBar } from '@/components/ui'
+import { ClubBar, Pressable } from '@/components/ui'
 import { hapticSelection } from '@/lib/haptics'
 import { fontFamilies, useTheme, withOpacity } from '@/theme'
 
@@ -113,6 +113,7 @@ export function OutcomePicker({ value, onChange, home, away, disabled }: Props) 
       />
 
       <Pressable
+        haptic={false}
         onPress={() => {
           if (disabled) return
           hapticSelection()
@@ -202,6 +203,7 @@ function ClubChoice({
 
   return (
     <Pressable
+      haptic={false}
       /*
         ⭐⭐ THE MOST-TAPPED CONTROL IN THE PRODUCT, AND IT WAS SILENT. The header
         above does the arithmetic: 10 fixtures × 38 matchweeks is 380 taps at

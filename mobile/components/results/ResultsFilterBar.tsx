@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ScrollView, Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type FilterMode = 'date' | 'round' | 'team' | 'group' | 'competition';

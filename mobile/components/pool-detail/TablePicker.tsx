@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 import { runOnJS } from 'react-native-reanimated';
 import {
   NestedReorderableList,
@@ -9,7 +9,7 @@ import {
   type ReorderableListReorderEvent,
 } from 'react-native-reorderable-list';
 
-import { ClubBar, Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text, Pressable } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
 import { useSharedActivity } from '@/lib/ActivityProvider';
 import { hapticDragEnd, hapticDragStart, hapticSelection } from '@/lib/haptics';

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { Text } from './Text';
-import { playFeel, type FeelName } from '@/lib/haptics';
+import { hapticTap, playFeel, type FeelName } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -22,20 +22,22 @@ type ButtonProps = Omit<PressableProps, 'style' | 'children'> & {
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
-   * Opt in to a haptic on press, naming a feel from `lib/haptics.ts`.
+   * Which feel this button uses. Omit for the app default; `false` for silence.
    *
-   * ⚠⚠ OPT-IN, AND IT MUST STAY THAT WAY. There are 429 `onPress` handlers
-   * across 132 files in this app. A default here would buzz most of them, and a
-   * buzz that happens everywhere stops meaning "that registered" and becomes
-   * ambient — which is how an app starts feeling cheap. This prop exists so
-   * adding a haptic to a button is one word instead of a wrapper, NOT so that
-   * every button gets one.
+   * ⚠⚠ THIS USED TO BE OPT-IN AND NOW IS NOT. The note here argued against a
+   * default, on the grounds that a buzz everywhere stops meaning anything.
+   * Ryan's brief — *"anything that can be interacted with needs a haptic
+   * feedback"* — overrides that, stated twice and the second time after hearing
+   * the argument. So a button buzzes unless told otherwise, like every other
+   * Pressable in the app. See `hapticTap`, which holds the full note and the
+   * single switch for retuning it.
    *
-   * ⭐ Firing on press rather than on the action's outcome is deliberate: the
-   * outcome belongs to whoever awaited it, and `hapticSuccess`/`hapticFailure`
-   * are theirs to call. This one only says "I felt your finger".
+   * ⭐ Firing on press rather than on the action's outcome is still deliberate:
+   * the outcome belongs to whoever awaited it, and `hapticSuccess` /
+   * `hapticFailure` are theirs to call. This one only says "I felt your
+   * finger" — which is why a commit button can carry BOTH.
    */
-  haptic?: FeelName;
+  haptic?: FeelName | false;
 };
 
 export function Button({
@@ -81,7 +83,8 @@ export function Button({
       // `onPress` is pulled out of `rest` so it can be wrapped. Pressable does
       // not fire it while disabled, so `loading` needs no guard of its own.
       onPress={(ev) => {
-        if (haptic) playFeel(haptic);
+        if (haptic === undefined) hapticTap();
+        else if (haptic) playFeel(haptic);
         onPress?.(ev);
       }}
       disabled={isDisabled}

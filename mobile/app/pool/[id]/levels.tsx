@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -10,7 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import type { LevelInfo, XPData } from '@/lib/api';
 import { useEntryAnalytics } from '@/lib/useEntryAnalytics';
 import { useEntryBracketAnalytics } from '@/lib/useEntryBracketAnalytics';

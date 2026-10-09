@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   Modal,
-  Pressable,
   ScrollView,
   Text as RNText,
   useWindowDimensions,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, SHEET_RADIUS } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type GroupOption = {

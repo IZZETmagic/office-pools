@@ -14,9 +14,9 @@
 // counters and the row badges re-settle in one render pass.
 
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

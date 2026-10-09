@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   Switch,
   Text as RNText,
@@ -19,7 +18,7 @@ import {
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import type {
   BPGroupRanking,
   BPKnockoutPick,

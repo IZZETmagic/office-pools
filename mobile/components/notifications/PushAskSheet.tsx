@@ -21,7 +21,6 @@ import {
   Easing,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -30,7 +29,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Icon, SHEET_HANDLE_WIDTH, SHEET_RADIUS } from '@/components/ui';
+import { Button, Icon, SHEET_HANDLE_WIDTH, SHEET_RADIUS, Pressable } from '@/components/ui';
 import type { PushAskMode } from '@/lib/pushAsk';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

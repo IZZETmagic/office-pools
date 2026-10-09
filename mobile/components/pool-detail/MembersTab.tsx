@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { useMemberRoster, type RosterMember } from '@/lib/useMemberRoster';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

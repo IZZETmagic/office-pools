@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  Pressable,
   RefreshControl,
   type RefreshControlProps,
   Text as RNText,
@@ -60,7 +59,7 @@ const MemoPlayerStatSheet = memo(PlayerStatSheet);
 import { MatchTabBar } from '@/components/match/MatchTabBar';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
-import { TeamMark, Icon, Text } from '@/components/ui';
+import { TeamMark, Icon, Text, Pressable } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';

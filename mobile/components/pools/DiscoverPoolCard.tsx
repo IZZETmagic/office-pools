@@ -1,9 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { DiscoverPool } from '@/lib/useDiscoverPools';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type DiscoverPoolCardProps = {
@@ -57,10 +56,7 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({
         backgroundColor: theme.colors.surface,
         borderRadius: theme.radii.lg,

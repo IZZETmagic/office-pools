@@ -1,9 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import { ClubRow, HeaderRow } from '@/components/league/leagueTableRow';
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import {
   clubColorFromCrestUrl,
   clubIdFromCrestUrl,
@@ -11,7 +11,6 @@ import {
 } from '@/lib/design/clubColors';
 import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import type { LeagueStandingRow } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -111,7 +110,6 @@ export function LeagueTableSliceCard({
       */}
       <Pressable
         onPress={() => {
-          hapticCardTap();
           router.navigate({
             // ⚠ `season`, not `seasonId` — the Results screen reads
             // `useLocalSearchParams<{ view, season }>`.

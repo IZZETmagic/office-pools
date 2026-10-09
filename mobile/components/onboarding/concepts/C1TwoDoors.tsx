@@ -14,12 +14,12 @@
 // Disclosure-gate sentence: "here are the two things, do either, both or neither." Passes.
 
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
-import { Button, Text } from '@/components/ui';
+import { Button, Text, Pressable } from '@/components/ui';
 import type { StoredAvatarBuild } from '@/lib/avatar/storedConfig';
 import { useTheme, withOpacity } from '@/theme';
 

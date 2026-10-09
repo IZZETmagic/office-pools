@@ -1,8 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';

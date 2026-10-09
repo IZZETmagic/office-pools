@@ -13,10 +13,10 @@
 
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, useSheetChrome } from '@/components/ui';
+import { Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { seatSelectionProblem } from '@/lib/createPool';
 import { personName, plural, type RosterView } from '@/lib/crews';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

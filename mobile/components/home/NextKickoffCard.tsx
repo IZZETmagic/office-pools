@@ -1,12 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, useMemo } from 'react';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { getMatchStatusBadge } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
+import { Pressable } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 import { clubOnSurface, fixturePalette } from '@/lib/design/clubColors';
 import { awayDisplayName, homeDisplayName } from '@/components/match/matchDisplay';
@@ -74,10 +74,7 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
     >
       <LinearGradient

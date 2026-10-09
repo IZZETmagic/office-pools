@@ -1,6 +1,6 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Icon, Text, Wordmark } from '@/components/ui';
+import { Icon, Text, Wordmark, Pressable } from '@/components/ui';
 import { getGreeting } from '@/lib/useHomeData';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

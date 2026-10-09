@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text as RNText, View } from 'react-native';
 
 import { Jersey } from '@/components/match/Jersey';
-import { ClubBar, Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text, Pressable } from '@/components/ui';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 import type { LmsMember, LmsPickCell, LmsState } from '@/lib/api';

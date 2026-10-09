@@ -1,9 +1,9 @@
-import { LayoutAnimation, Platform, Pressable, Text as RNText, UIManager, View } from 'react-native';
+import { LayoutAnimation, Platform, Text as RNText, UIManager, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { GroupStandingsTable } from './GroupStandingsTable';
 import { MatchPredictionRow } from './MatchPredictionRow';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type { Match, ScoreEntry, Team } from '@/lib/bracket/tournament';
 import { isPredictionComplete } from '@/lib/bracket/tournament';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

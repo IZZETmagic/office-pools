@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   LayoutAnimation,
   Platform,
-  Pressable,
   StyleSheet,
   Switch,
   Text as RNText,
@@ -15,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { hapticToggle } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

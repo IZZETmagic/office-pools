@@ -55,7 +55,6 @@ import {
   Keyboard,
   Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text as RNText,
   TextInput,
@@ -88,7 +87,7 @@ import Animated, {
 import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ActionMenu, ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
+import { ActionMenu, ConfirmDialog, Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { REPORT_REASONS, type ReportReason } from '@/lib/moderation';
 import { PHOTO_MESSAGE_CONTENT, fitPhoto, readPhotoMetadata } from '@/lib/photoMessage';
 import {

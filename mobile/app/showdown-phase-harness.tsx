@@ -38,11 +38,11 @@
 // =============================================================
 
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
 import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet';
 import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';

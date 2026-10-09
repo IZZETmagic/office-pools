@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text as RNText } from 'react-native';
+import { Animated, Text as RNText } from 'react-native';
 
+import { Pressable } from '@/components/ui';
 import { useTheme, withOpacity } from '@/theme';
 
 export const REACTION_EMOJIS = ['👍', '❤️', '🔥', '😂', '🎉', '👀'];

@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { type FilterSheetConfig } from './PoolsFilterSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

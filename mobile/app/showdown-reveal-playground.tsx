@@ -14,7 +14,7 @@
 // The timing + easing + beat structure should not change at that point.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -34,6 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useDerivedValue } from 'react-native-reanimated';
+import { Pressable } from '@/components/ui';
 
 // Lazy-load Skia so the playground keeps rendering on a dev build that
 // hasn't yet been rebuilt with the new native module. Without this, the

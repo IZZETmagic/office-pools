@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import {
   type LayoutChangeEvent,
-  Pressable,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -14,7 +13,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { ALL_MATCH_TAB_KEYS, type MatchTabKey } from '@/lib/matchTabs';
 import { fontFamilies, useTheme } from '@/theme';
 

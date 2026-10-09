@@ -6,7 +6,6 @@ import {
   Easing,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   Text as RNText,
   useWindowDimensions,
@@ -15,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TableBreakdownList } from './TableBreakdownList';
-import { Icon, SHEET_RADIUS, Text } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Text, Pressable } from '@/components/ui';
 import { fetchTablePrediction } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TableBreakdownList, TablePicker } from '@/components/pool-detail';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { fetchTablePrediction } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

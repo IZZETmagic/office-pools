@@ -10,7 +10,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
-  Pressable,
   Text as RNText,
   useWindowDimensions,
   View,
@@ -27,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Text } from '@/components/ui';
+import { Button, Text, Pressable } from '@/components/ui';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { OnboardingSlide } from './OnboardingSlide';

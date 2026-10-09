@@ -9,7 +9,6 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   View,
   Text as RNText,
@@ -18,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { composeAvatar, headOnly, PALETTE, type AvatarConfig } from '@/lib/avatar/compose';
 import { GlassesIcon, HeadIcon, MoustacheIcon } from '@/lib/avatar/stepIcons';
 import {
@@ -330,6 +329,9 @@ export default function AvatarEditorScreen() {
           return (
             <Pressable
               key={s.key}
+              // ⚠ Chooses its own feel below; `false` stops the wrapper's
+              // default landing on top of it.
+              haptic={false}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={s.label}
@@ -669,6 +671,7 @@ function Swatches({
   const items = colours.map((c) => (
         <Pressable
           key={c}
+          haptic={false}
           accessibilityRole="button"
           accessibilityState={{ selected: value === c }}
           onPress={() => {
@@ -750,6 +753,7 @@ function MatchHairTile({
 
   return (
     <Pressable
+      haptic={false}
       accessibilityRole="button"
       accessibilityLabel="Match hair"
       accessibilityState={{ selected }}
@@ -898,6 +902,7 @@ function Heads({
       {tiles.map(({ k, head }) => (
         <Pressable
           key={k ?? 'none'}
+          haptic={false}
           accessibilityRole="button"
           accessibilityState={{ selected: value === k }}
           onPress={() => {

@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   Text as RNText,
   TextInput,
@@ -10,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import { recalculatePool } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { usePoolSettings, type PoolSettings } from '@/lib/usePoolSettings';

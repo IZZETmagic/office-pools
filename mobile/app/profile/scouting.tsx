@@ -9,13 +9,13 @@
 // ⚠ NEEDS `/api/me/scouting` ON THE SERVER THE APP POINTS AT. Deploy the API
 // before any OTA that ships this screen, or it opens onto "couldn't load".
 
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SelfScoutReport } from '@/components/scouting/Dossier';
 import { MemberSubject, ScoutHeader } from '@/components/scouting/kit';
 import { SettingsHeader } from '@/components/settings';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { useSelfScout } from '@/lib/useSelfScout';

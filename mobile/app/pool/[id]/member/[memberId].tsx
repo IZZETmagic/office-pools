@@ -3,7 +3,6 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -14,7 +13,7 @@ import {
   AdjustPointsSheet,
   type AdjustPointsSheetHandle,
 } from '@/components/pool-detail/AdjustPointsSheet';
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, Pressable } from '@/components/ui';
 import { deleteEntry, removeMember } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';

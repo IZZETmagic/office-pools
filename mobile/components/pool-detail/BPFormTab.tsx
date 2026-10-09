@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -14,7 +13,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { BadgeDetailSheet, type BadgeDetailSheetHandle } from './BadgeDetailSheet';
 import { badgeIcon } from './badge-icons';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import type {
   BadgeInfo,
   BPAnalyticsResponse,

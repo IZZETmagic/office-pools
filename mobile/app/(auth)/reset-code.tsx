@@ -1,9 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable } from 'react-native';
 
 import { ResetShell } from '@/components/auth/ResetShell';
-import { Button, Input, Text } from '@/components/ui';
+import { Button, Input, Text, Pressable } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   RESEND_COOLDOWN_SECONDS,

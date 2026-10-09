@@ -1,12 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
-import { View, Text as RNText, Pressable } from 'react-native';
+import { View, Text as RNText } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { useMyAvatar } from '@/lib/useMyAvatar';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -139,7 +138,6 @@ export function AvatarCard({
           accessibilityRole="button"
           accessibilityLabel={avatar?.hasAvatar ? 'Edit your avatar' : 'Build your avatar'}
           onPress={() => {
-            hapticCardTap();
             router.push('/profile/avatar');
           }}
           style={{

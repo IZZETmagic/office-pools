@@ -8,11 +8,10 @@
 // (lib/crews/needs.ts); the screen decides what each one calls.
 
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Text as RNText, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import type { NeedAction, NeedsYouItem } from '@/lib/api';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { deadlineLabel } from './NeedsYouCard';
@@ -104,7 +103,6 @@ export function CrewNeedsCard({
                 // navigates — `run` awaits a mutation. It still takes the card
                 // tick so cards feel uniform; the OUTCOME is the parent's to
                 // report, via onAction.
-                hapticCardTap();
                 void run(a);
               }}
               disabled={busy !== null}

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ScrollView, Text as RNText, View } from 'react-native';
 
 import { ClubRow, HeaderRow, Legend } from '@/components/league/leagueTableRow';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import type { LeagueSeasonTable } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

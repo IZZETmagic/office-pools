@@ -1,12 +1,11 @@
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Image, Platform, Text as RNText, View } from 'react-native';
 
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { CompetitionRail } from '@/components/CompetitionRail';
-import { ProgressRing, Text } from '@/components/ui';
+import { ProgressRing, Text, Pressable } from '@/components/ui';
 import { avatarBackgroundFor, avatarIndexFor, groundInkFor } from '@/lib/avatarGradient';
 import { getCompetitionColor } from '@/lib/design/competition';
 import type { PoolCardMember, PoolSummary } from '@/lib/useHomeData';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type PoolCardProps = {
@@ -43,10 +42,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({
         // ⚠ 244 IS 220 PLUS THE RAIL, not a round number picked by eye. The
         // competition rail is 30px where the mode bar it replaced was 5, so the

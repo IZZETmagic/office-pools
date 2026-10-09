@@ -20,10 +20,10 @@
 
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Platform, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import {
   androidApiLevel,
   describeFeel,
@@ -129,6 +129,7 @@ export default function HapticsHarness() {
           }}
         >
           <Pressable
+            haptic={false}
             onPress={() => router.back()}
             hitSlop={8}
             accessibilityRole="button"
@@ -180,6 +181,12 @@ export default function HapticsHarness() {
             return (
               <Pressable
                 key={key}
+                // ⚠⚠ SILENT WRAPPER, OR THE INSTRUMENT LIES. Every Pressable in
+                // the app now ticks by default; here that tick would land on
+                // top of the feel being tested, so each row would be "tap plus
+                // the feel" and no two rows could be told apart. The whole
+                // screen exists to compare feels — it must add none of its own.
+                haptic={false}
                 onPress={() => firePair(a, b)}
                 disabled={running}
                 accessibilityRole="button"
@@ -228,6 +235,7 @@ export default function HapticsHarness() {
             return (
               <Pressable
                 key={name}
+                haptic={false}
                 onPress={() => fire(name)}
                 accessibilityRole="button"
                 accessibilityLabel={`Play ${name}`}

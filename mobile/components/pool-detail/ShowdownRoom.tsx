@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Card, Icon, Text } from '@/components/ui';
+import { Card, Icon, Text, Pressable } from '@/components/ui';
 import { duelResult } from '@/lib/duelPoints';
 import { buildSheet, sheetSummary, type SheetFixture } from '@/lib/duelSheet';
 import { fixturesForWeek } from '@/lib/pickemWeek';

@@ -6,14 +6,13 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RosterReviewSheet, type RosterReviewSheetHandle } from '@/components/crews/RosterReviewSheet';
-import { Button, ConfirmDialog, Icon, Input, Text } from '@/components/ui';
+import { Button, ConfirmDialog, Icon, Input, Text, Pressable } from '@/components/ui';
 import { createPool } from '@/lib/api';
 import {
   LEAGUE_DEPTHS,

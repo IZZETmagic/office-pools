@@ -405,27 +405,30 @@ export function hapticToggleOff(): void {
 }
 
 /**
- * A card or list row was tapped to open it.
+ * ANYTHING INTERACTIVE was touched. The app's default tap feel.
  *
- * ⭐⭐ ONE LINE CONTROLS EVERY CARD IN THE APP. Twenty press sites across
- * eighteen card components call this and nothing else, so retuning card taps —
- * or removing them — is a change here rather than twenty edits. That is the
- * whole reason it is a named dispatcher instead of twenty inline
- * `hapticSelection()` calls.
+ * ⭐⭐ ONE FUNCTION BEHIND EVERY TAP IN THE APP. `components/ui/Tappable.tsx`
+ * calls this for every Pressable that has not asked for something else, which
+ * is 507 handlers across 135 files. Retuning the whole app's tap feel — or
+ * silencing it — is a change here. That is the only reason a policy this broad
+ * is maintainable at all.
  *
- * ⚠⚠ DELIBERATELY THE FAINTEST FEEL WE HAVE, and it is still a judgement call
- * against both platforms. Neither iOS nor Android buzzes on list navigation:
- * tapping a row in Settings, Mail, the App Store, Gmail or the Play Store does
- * nothing, because the screen transition IS the feedback. Ryan asked for it
- * anyway, knowing that, and chose the lighter tick over the firmer press — so
- * `selection` rather than `press`, which keeps the firm one meaning "a control
- * did something" rather than "you went somewhere".
+ * ⚠⚠ RYAN'S CALL, MADE TWICE, AGAINST BOTH PLATFORMS' CONVENTIONS. Neither iOS
+ * nor Android buzzes on ordinary taps or list navigation: tapping a row in
+ * Settings, Mail, the App Store, Gmail or the Play Store does nothing on any
+ * phone, because the visual response IS the feedback. Apple reserves haptics
+ * for selection changes, toggles, drags, thresholds and notifications. The
+ * brief here is "anything that can be interacted with needs haptic feedback",
+ * which is a deliberate departure, and it is recorded as one so that nobody
+ * later reads it as an accident and "fixes" it.
  *
- * ⚠ The nav bar already presses, so an ordinary browse — tab, card, inner tab,
- * row, back, card — is five buzzes in about eight seconds. If that reads as
- * ambient rather than responsive, this function is the switch.
+ * ⭐ IT IS THE FAINTEST FEEL WE HAVE, and that is what makes the rest survive.
+ * If every tap used `press`, the firm one would stop meaning "a control did
+ * something". So: `selection` everywhere by default, and the stronger feels
+ * stay earned — `success` for a commit, `warning` for something destructive,
+ * `dragStart` for a pickup.
  */
-export function hapticCardTap(): void {
+export function hapticTap(): void {
   play('selection');
 }
 

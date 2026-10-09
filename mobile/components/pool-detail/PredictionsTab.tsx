@@ -1,10 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, Text as RNText, View } from 'react-native';
 
 import { LeaderboardAvatar } from './LeaderboardAvatar';
-import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text } from '@/components/ui';
+import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text, Pressable } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { useMemberRoster } from '@/lib/useMemberRoster';
 import { usePoolEntries, type PoolEntry } from '@/lib/usePoolEntries';

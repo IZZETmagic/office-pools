@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
 
 import { ResetShell } from '@/components/auth/ResetShell';
-import { Button, Input, Text } from '@/components/ui';
+import { Button, Input, Text, Pressable } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { MIN_PASSWORD_LENGTH, validateNewPassword } from '@/lib/passwordReset';
 import { useTheme } from '@/theme';

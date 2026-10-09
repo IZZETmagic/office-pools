@@ -1,12 +1,11 @@
 import { router } from 'expo-router';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
-import { ClubBar, Text } from '@/components/ui';
+import { ClubBar, Text, Pressable } from '@/components/ui';
 import type { FormResult } from '@/lib/matchContext';
 import type { ResultsMatch, ResultsTeam } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -188,7 +187,6 @@ function FormRow({
   return (
     <Pressable
       onPress={() => {
-        hapticCardTap();
         router.push(`/match/${result.matchId}`);
       }}
       accessibilityRole="button"
@@ -417,7 +415,6 @@ function EarlierMeeting({ match, earlier }: { match: ResultsMatch; earlier: Resu
       />
       <Pressable
         onPress={() => {
-          hapticCardTap();
           router.push(`/match/${earlier.matchId}`);
         }}
         accessibilityRole="button"

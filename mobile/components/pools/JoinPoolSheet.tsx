@@ -18,10 +18,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Linking, Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text, useSheetChrome } from '@/components/ui';
+import { Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { joinPool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';

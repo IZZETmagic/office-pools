@@ -6,11 +6,11 @@
 // admin gets Restore (Ryan's call 2026-07-30).
 
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsHeader } from '@/components/settings';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { restorePool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useArchivedPools, type ArchivedPoolRow } from '@/lib/useArchivedPools';

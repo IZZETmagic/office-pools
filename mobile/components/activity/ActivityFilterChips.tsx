@@ -1,9 +1,10 @@
 // The chips over the Activity history. Sticky under the header, so the filter
 // stays in reach while scrolling a long week.
 
-import { Pressable, ScrollView, Text as RNText } from 'react-native';
+import { ScrollView, Text as RNText } from 'react-native';
 
 import { FILTERS, type ActivityFilter } from '@/lib/activityFilters';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme } from '@/theme';
 
 export function ActivityFilterChips({

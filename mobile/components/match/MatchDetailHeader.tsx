@@ -2,7 +2,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  Pressable,
   type StyleProp,
   Text as RNText,
   useWindowDimensions,
@@ -22,7 +21,7 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { useAnimatedProps } from 'react-native-reanimated';
 
-import { AnimatedTextBox, Icon } from '@/components/ui';
+import { AnimatedTextBox, Icon, Pressable } from '@/components/ui';
 import { clubOnSurface, fixturePalette } from '@/lib/design/clubColors';
 import { getCompetitionBand, getCompetitionGlow, GLOW_HEIGHT } from '@/lib/design/competitionBand';
 import { hasScorers, matchScorers, type ScorerLine } from '@/lib/matchScorers';

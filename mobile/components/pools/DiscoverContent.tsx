@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Platform, ScrollView, TextInput, View } from 'react-native';
 
 import { DiscoverPoolCard } from './DiscoverPoolCard';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { useDiscoverPools } from '@/lib/useDiscoverPools';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 

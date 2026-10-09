@@ -1,8 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Button, Card, ClubBar, Icon, Text } from '@/components/ui';
+import { Button, Card, ClubBar, Icon, Text, Pressable } from '@/components/ui';
 import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';

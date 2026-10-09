@@ -1,8 +1,9 @@
 // Small building blocks shared by My Crews and the crew page — the same card, row and section
 // shapes the Seasons screen uses, so the Profile hub's pages read as one family.
 
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export function Notice({ text, action, onAction }: { text: string; action?: string; onAction?: () => void }) {

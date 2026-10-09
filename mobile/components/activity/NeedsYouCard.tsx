@@ -3,10 +3,10 @@
 // next fetch after the pick is made (derived server-side, see
 // lib/activity/needsYou.ts on web).
 
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import type { NeedsYouItem } from '@/lib/useActivity';
-import { hapticCardTap } from '@/lib/haptics';
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme } from '@/theme';
 
 /** "45m left", "5h left", else "Sat 7:30 am" in the device's time zone. */
@@ -33,10 +33,7 @@ export function NeedsYouCard({ item, onPress }: { item: NeedsYouItem; onPress: (
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${item.subtitle}. ${item.cta}`}
       style={({ pressed }) => ({

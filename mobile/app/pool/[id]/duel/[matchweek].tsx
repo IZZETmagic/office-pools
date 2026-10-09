@@ -38,10 +38,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, Icon, Text } from '@/components/ui';
+import { Card, Icon, Text, Pressable } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from '@/components/pool-detail/TeamSheet';
 import type { Standing } from '@/components/pool-detail/ShowdownDuelHeader';

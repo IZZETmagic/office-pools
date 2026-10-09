@@ -176,10 +176,10 @@ describe('the haptics table', () => {
     // exception that is declared stays reviewable, and the rule stays absolute
     // for everything else. A new `hapticX` with no entry would throw on its
     // first tap, which is what this test is really protecting.
-    // `cardTap` is `selection` under a name every card shares, so the card-tap
-    // decision has one switch instead of twenty call sites. Like `toggle`, it
-    // names no row of its own.
-    const DISPATCHERS = ['toggle', 'cardTap'];
+    // `tap` is `selection` under the name every Pressable in the app shares,
+    // so the whole app's default tap feel has one switch rather than 507 call
+    // sites. Like `toggle`, it names no row of its own.
+    const DISPATCHERS = ['toggle', 'tap'];
     const exported = [...src.matchAll(/^export function haptic(\w+)\(/gm)]
       .map((m) => m[1][0].toLowerCase() + m[1].slice(1))
       .filter((name) => !DISPATCHERS.includes(name));

@@ -1,9 +1,10 @@
 import { MessageMultiple01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text as RNText, View } from 'react-native';
+import { Animated, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Pressable } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {

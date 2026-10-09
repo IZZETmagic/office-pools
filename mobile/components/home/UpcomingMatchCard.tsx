@@ -1,13 +1,12 @@
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Image, Platform, Text as RNText, View } from 'react-native';
 
-import { ClubBar, Text } from '@/components/ui';
+import { ClubBar, Text, Pressable } from '@/components/ui';
 import {
   clubColorFromCrestUrl,
   clubIdFromCrestUrl,
   fixturePalette,
 } from '@/lib/design/clubColors';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
-import { hapticCardTap } from '@/lib/haptics';
 import { fontFamilies, useTheme } from '@/theme';
 
 type UpcomingMatchCardProps = {
@@ -51,10 +50,7 @@ export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
 
   return (
     <Pressable
-      onPress={() => {
-        hapticCardTap();
-        onPress?.();
-      }}
+      onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

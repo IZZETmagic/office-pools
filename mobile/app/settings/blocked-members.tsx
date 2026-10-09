@@ -6,11 +6,11 @@
 // tell them either.
 
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsHeader } from '@/components/settings';
-import { Text } from '@/components/ui';
+import { Text, Pressable } from '@/components/ui';
 import { fetchBlockedMembers, unblockMember, type BlockedMember } from '@/lib/moderation';
 import { fontFamilies, useTheme } from '@/theme';
 

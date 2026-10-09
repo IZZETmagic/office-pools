@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ClubBar, Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text, Pressable } from '@/components/ui';
 import { fetchLmsState, saveLmsPick, type LmsState } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';

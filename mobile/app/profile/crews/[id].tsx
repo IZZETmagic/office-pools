@@ -13,14 +13,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddPeopleSheet, type AddPeopleSheetHandle } from '@/components/crews/AddPeopleSheet';
 import { Card, Hint, Notice, Row, Section } from '@/components/crews/bits';
 import { CrewFace } from '@/components/crews/CrewFace';
 import { SettingsHeader } from '@/components/settings';
-import { ConfirmDialog, Icon, PromptDialog } from '@/components/ui';
+import { ConfirmDialog, Icon, PromptDialog, Pressable } from '@/components/ui';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { ActionSheet, type ActionSheetOption } from '@/components/ui/ActionSheet';
 import {

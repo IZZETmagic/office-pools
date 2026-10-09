@@ -1,6 +1,6 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, Pressable } from '@/components/ui';
 import { useTheme } from '@/theme';
 
 type PredictionsAlertBannerProps = {

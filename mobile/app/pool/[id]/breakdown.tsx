@@ -2,7 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   Text as RNText,
   View,
@@ -15,7 +14,7 @@ import type {
   BreakdownPoolSettings,
   BreakdownResponse,
 } from '@/lib/api';
-import { Icon } from '@/components/ui';
+import { Icon, Pressable } from '@/components/ui';
 import { useBreakdown } from '@/lib/useBreakdown';
 import { useEntryAdjustments, type EntryAdjustment } from '@/lib/useEntryAdjustments';
 import { fontFamilies, typography, useTheme, withOpacity } from '@/theme';

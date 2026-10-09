@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import {
   type LayoutChangeEvent,
-  Pressable,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -14,7 +13,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
-import { Icon, NotificationDot } from '@/components/ui';
+import { Icon, NotificationDot, Pressable } from '@/components/ui';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { ALL_TABS, getVisiblePoolTabs, type PoolTabKey, type TabDef } from '@/lib/poolTabs';
 import { fontFamilies, resolveColors, useTheme, withOpacity } from '@/theme';
