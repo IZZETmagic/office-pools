@@ -5,6 +5,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  DiscoverFilterSheet,
   DiscoverFilters,
   DiscoverList,
   EmptyPools,
@@ -17,10 +18,16 @@ import {
   type PoolsFilterSheetHandle,
   PoolsHeader,
   PoolsSegment,
-  type DiscoverModeFilter,
   type PoolsTab,
 } from '@/components/pools';
 import { Button, Icon, Pressable, Text } from '@/components/ui';
+import {
+  applyDiscoverFilters,
+  clearDiscoverFilters,
+  countDiscoverFilters,
+  DEFAULT_DISCOVER_FILTERS,
+  type DiscoverFilters as DiscoverFilterState,
+} from '@/lib/discoverFilter';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import {
   applyFilters,
@@ -29,6 +36,7 @@ import {
   DEFAULT_FILTERS,
   type PoolsFilters,
 } from '@/lib/poolsFilter';
+import { useDiscoverPools } from '@/lib/useDiscoverPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -47,9 +55,12 @@ export default function PoolsScreen() {
   const [tab, setTab] = useState<PoolsTab>('my-pools');
   const [filters, setFilters] = useState<PoolsFilters>(DEFAULT_FILTERS);
   const [discoverSearch, setDiscoverSearch] = useState('');
-  const [discoverMode, setDiscoverMode] = useState<DiscoverModeFilter>('all');
-  // Sort-and-filter sheet, opened by the button in the header row.
+  // Discover's own filters — separate from My Pools', so choosing a
+  // competition there does not quietly narrow your own list.
+  const [discoverFilters, setDiscoverFilters] = useState<DiscoverFilterState>(DEFAULT_DISCOVER_FILTERS);
+  // Sort-and-filter sheets, one per segment, opened by the header's button.
   const filterSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
+  const discoverSheetRef = useRef<PoolsFilterSheetHandle | null>(null);
   // Create/Join sheet ref — opened from the "+" button in PoolsHeader.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
   // Join-pool input sheet — opened either from PoolCreateJoinSheet's
@@ -88,6 +99,15 @@ export default function PoolsScreen() {
 
   const isMyPools = tab === 'my-pools';
   const hasAnyPools = allPools.length > 0;
+
+  // Discover loads the first time it is shown, then keeps its list.
+  const discover = useDiscoverPools({ enabled: !isMyPools });
+  const visibleDiscover = useMemo(
+    () => applyDiscoverFilters(discover.pools, discoverFilters, discoverSearch),
+    [discover.pools, discoverFilters, discoverSearch],
+  );
+  const discoverFilterCount = countDiscoverFilters(discoverFilters);
+  const hasDiscoverPools = discover.pools.length > 0;
 
   const headerTitlePrefix = isMyPools ? 'Your' : 'Discover';
   const headerSubtitle = isMyPools ? 'Where the banter begins' : 'Find a pool to join';
@@ -135,13 +155,21 @@ export default function PoolsScreen() {
         active={tab}
         onChange={setTab}
         filter={
-          isMyPools && hasAnyPools
-            ? {
-                activeCount: activeFilterCount,
-                sortChanged: filters.sort !== DEFAULT_FILTERS.sort,
-                onPress: () => filterSheetRef.current?.open(),
-              }
-            : null
+          isMyPools
+            ? hasAnyPools
+              ? {
+                  activeCount: activeFilterCount,
+                  sortChanged: filters.sort !== DEFAULT_FILTERS.sort,
+                  onPress: () => filterSheetRef.current?.open(),
+                }
+              : null
+            : hasDiscoverPools
+              ? {
+                  activeCount: discoverFilterCount,
+                  sortChanged: discoverFilters.sort !== DEFAULT_DISCOVER_FILTERS.sort,
+                  onPress: () => discoverSheetRef.current?.open(),
+                }
+              : null
         }
       />
       {/* ⚠ THE FILTERS LIVE IN A SHEET NOW, so the list must say when it is
@@ -156,11 +184,14 @@ export default function PoolsScreen() {
         />
       ) : null}
       {!isMyPools ? (
-        <DiscoverFilters
-          search={discoverSearch}
-          onSearchChange={setDiscoverSearch}
-          mode={discoverMode}
-          onModeChange={setDiscoverMode}
+        <DiscoverFilters search={discoverSearch} onSearchChange={setDiscoverSearch} />
+      ) : null}
+      {/* Below the search box on Discover, because the count includes it. */}
+      {!isMyPools && hasDiscoverPools && discoverFilterCount > 0 ? (
+        <FilteredSummary
+          shown={visibleDiscover.length}
+          total={discover.pools.length}
+          onClear={() => setDiscoverFilters(clearDiscoverFilters(discoverFilters))}
         />
       ) : null}
       <ScrollView
@@ -197,7 +228,12 @@ export default function PoolsScreen() {
             ))
           )
         ) : (
-          <DiscoverList search={discoverSearch} mode={discoverMode} />
+          <DiscoverList
+            pools={visibleDiscover}
+            loading={discover.loading}
+            error={discover.error}
+            narrowed={discoverSearch.trim() !== '' || discoverFilterCount > 0}
+          />
         )}
       </ScrollView>
         </>
@@ -211,6 +247,12 @@ export default function PoolsScreen() {
         pools={allPools}
         filters={filters}
         onChange={setFilters}
+      />
+      <DiscoverFilterSheet
+        ref={discoverSheetRef}
+        pools={discover.pools}
+        filters={discoverFilters}
+        onChange={setDiscoverFilters}
       />
 
       {/* Create/Join action sheet — opened by tapping the "+" in

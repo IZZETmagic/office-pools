@@ -1,34 +1,26 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { Platform, ScrollView, TextInput, View } from 'react-native';
+import { Platform, TextInput, View } from 'react-native';
 
 import { DiscoverPoolCard } from './DiscoverPoolCard';
 import { Icon, Text, Pressable } from '@/components/ui';
-import { useDiscoverPools } from '@/lib/useDiscoverPools';
+import type { DiscoverPool } from '@/lib/useDiscoverPools';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
-
-export type DiscoverModeFilter = 'all' | 'full_tournament' | 'progressive' | 'bracket_picker';
-
-const MODE_PILLS: Array<{ value: DiscoverModeFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'full_tournament', label: 'Full Tournament' },
-  { value: 'progressive', label: 'Progressive' },
-  { value: 'bracket_picker', label: 'Bracket' },
-];
 
 type DiscoverFiltersProps = {
   search: string;
   onSearchChange: (value: string) => void;
-  mode: DiscoverModeFilter;
-  onModeChange: (mode: DiscoverModeFilter) => void;
 };
 
-export function DiscoverFilters({
-  search,
-  onSearchChange,
-  mode,
-  onModeChange,
-}: DiscoverFiltersProps) {
+/**
+ * Discover's search box.
+ *
+ * Its type pills moved into the filter sheet (`DiscoverFilterSheet`) with the
+ * header's filter button. ⚠ THEY HAD ONLY EVER KNOWN THE THREE WORLD CUP
+ * MODES and matched them against `predictionMode`, so no pill could show a
+ * league pool — and on 2026-10-09 both public pools were Premier League
+ * Pick'em, so three of the four pills led to "No pools match".
+ */
+export function DiscoverFilters({ search, onSearchChange }: DiscoverFiltersProps) {
   const theme = useTheme();
 
   return (
@@ -37,7 +29,6 @@ export function DiscoverFilters({
         paddingHorizontal: theme.spacing.xl,
         paddingTop: theme.spacing.sm,
         paddingBottom: theme.spacing.md,
-        gap: theme.spacing.md,
         backgroundColor: theme.colors.snow,
       }}
     >
@@ -75,62 +66,21 @@ export function DiscoverFilters({
           </Pressable>
         ) : null}
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: theme.spacing.sm, paddingVertical: 2, alignItems: 'center' }}
-        style={{ flexGrow: 0 }}
-      >
-        {MODE_PILLS.map((p) => {
-          const active = mode === p.value;
-          return (
-            <Pressable
-              key={p.value}
-              onPress={() => onModeChange(p.value)}
-              style={({ pressed }) => ({
-                paddingHorizontal: theme.spacing.md,
-                paddingVertical: theme.spacing.xs + 2,
-                borderRadius: theme.radii.pill,
-                backgroundColor: active ? theme.colors.primary : theme.colors.mist,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 12,
-                  color: active ? '#FFFFFF' : theme.colors.slate,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {p.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
     </View>
   );
 }
 
 type DiscoverListProps = {
-  search: string;
-  mode: DiscoverModeFilter;
+  /** Already searched, filtered and sorted — `applyDiscoverFilters`, on the screen. */
+  pools: DiscoverPool[];
+  loading: boolean;
+  error: string | null;
+  /** A search or a filter is narrowing the list, so empty means "no match", not "none exist". */
+  narrowed: boolean;
 };
 
-export function DiscoverList({ search, mode }: DiscoverListProps) {
+export function DiscoverList({ pools: filtered, loading, error, narrowed }: DiscoverListProps) {
   const theme = useTheme();
-  const { pools, loading, error } = useDiscoverPools();
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return pools.filter((p) => {
-      if (mode !== 'all' && p.predictionMode !== mode) return false;
-      if (q && !p.poolName.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [pools, search, mode]);
 
   function handleCardPress(poolId: string) {
     router.navigate(`/pool-preview/${poolId}`);
@@ -151,7 +101,7 @@ export function DiscoverList({ search, mode }: DiscoverListProps) {
   }
 
   if (filtered.length === 0) {
-    if (search || mode !== 'all') {
+    if (narrowed) {
       return (
         <DiscoverState
           icon="line.3.horizontal.decrease.circle"

@@ -1,7 +1,8 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { Platform, Text as RNText, View } from 'react-native';
 
+import { CompetitionRail } from '@/components/CompetitionRail';
 import { Icon, Text, Pressable } from '@/components/ui';
+import { getModeChip, getModeName, isLeaguePoolMode } from '@/lib/design/poolMode';
 import type { DiscoverPool } from '@/lib/useDiscoverPools';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -10,23 +11,12 @@ type DiscoverPoolCardProps = {
   onPress?: () => void;
 };
 
-const MODE_LABEL: Record<string, string> = {
-  full_tournament: 'Full Tournament',
-  progressive: 'Progressive',
-  bracket_picker: 'Bracket Picker',
-};
-
-const MODE_GRADIENT: Record<string, [string, string]> = {
-  full_tournament: ['#667EEA', '#3B6EFF'],
-  progressive: ['#34D399', '#059669'],
-  bracket_picker: ['#FBBF24', '#D97706'],
-};
-
-const MODE_COLOR: Record<string, string> = {
-  full_tournament: '#3B6EFF',
-  progressive: '#059669',
-  bracket_picker: '#D97706',
-};
+// ⚠ THIS CARD WAS WORLD-CUP-ONLY UNTIL 2026-10-09 — the same bug the Pools
+// tab card had until 2026-09-05. It held a three-entry MODE_LABEL read with
+// `?? 'Pool'` and a gradient read with `?? full_tournament`, so every league
+// pool wore the word "Pool" on a World Cup blue strip. That was BOTH public
+// pools on Discover that day (Premier League Pick'em). It now names the game
+// and the competition the way PoolListItem does.
 
 function brandHex(hex: string | null): string | null {
   if (!hex) return null;
@@ -48,11 +38,14 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   const theme = useTheme();
   const brandColor = brandHex(pool.brandColor);
   const isBranded = Boolean(pool.brandName && brandColor);
-  const mode = pool.predictionMode ?? 'full_tournament';
-  const modeLabel = MODE_LABEL[mode] ?? 'Pool';
-  const modeColor = MODE_COLOR[mode] ?? theme.colors.primary;
-  const modeGradient = MODE_GRADIENT[mode] ?? MODE_GRADIENT.full_tournament;
-  const deadline = formatDeadline(pool.predictionDeadline);
+  const modeLabel = getModeName(pool.predictionMode, pool.leagueMode);
+  const modeChip = getModeChip(pool.predictionMode, pool.leagueMode, theme.mode === 'dark');
+  // ⚠ NOT FOR A LEAGUE POOL. Its `prediction_deadline` is the end of the season
+  // (May 2027 on both public pools, 2026-10-09), so the chip read "232d" —
+  // true, and no use to someone deciding whether to join this week.
+  const deadline = isLeaguePoolMode(pool.predictionMode)
+    ? null
+    : formatDeadline(pool.predictionDeadline);
 
   return (
     <Pressable
@@ -66,13 +59,10 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
         ...theme.shadows.card,
       })}
     >
+      {/* The competition, named down the side — as on the My Pools card. A
+          branded pool shows its banner instead; one identity per card. */}
       {!isBranded ? (
-        <LinearGradient
-          colors={modeGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={{ width: 5 }}
-        />
+        <CompetitionRail externalLeagueId={pool.externalLeagueId} size="default" />
       ) : null}
 
       <View style={{ flex: 1 }}>
@@ -138,7 +128,7 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
               gap: theme.spacing.sm,
             }}
           >
-            <ModePill label={modeLabel} color={modeColor} />
+            <ModePill label={modeLabel} chip={modeChip} />
             <View style={{ flex: 1 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Icon name="person.2.fill" color="slate" size={14} />
@@ -175,21 +165,28 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   );
 }
 
-function ModePill({ label, color }: { label: string; color: string }) {
+/** The game, in its identity colour — the same pill as the My Pools card. */
+function ModePill({
+  label,
+  chip,
+}: {
+  label: string;
+  chip: { base: string; ink: string; tint: number };
+}) {
   return (
     <View
       style={{
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 999,
-        backgroundColor: withOpacity(color, 0.1),
+        backgroundColor: withOpacity(chip.base, chip.tint),
       }}
     >
       <RNText
         style={{
           fontFamily: fontFamilies.semibold,
           fontSize: 11,
-          color,
+          color: chip.ink,
         }}
       >
         {label}

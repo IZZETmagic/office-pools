@@ -1,5 +1,7 @@
-// The Pools tab's sort-and-filter sheet — one live half-sheet holding every
-// axis at once (Concept E, picked 2026-10-09).
+// The Pools tab's sort-and-filter sheets — one live half-sheet holding every
+// axis at once (Concept E, picked 2026-10-09). Two of them, built from the same
+// shell and rows: `PoolsFilterSheet` for My Pools and `DiscoverFilterSheet` for
+// Discover, which leaves out Status and Picks.
 //
 // ## ⭐ LIVE, NOT APPLY
 //
@@ -42,6 +44,7 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, useWindowDimensions, View, type StyleProp, type TextStyle } from 'react-native';
 import { GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,9 +63,14 @@ import {
 } from './controlShape';
 import { Icon, Pressable, Text, useSheetChrome } from '@/components/ui';
 import { LEAGUE_MODES as LEAGUE_MODE_OPTIONS, WC_MODES } from '@/lib/createPool';
-import { getCompetitionColor } from '@/lib/design/competition';
+import { getCompetitionColor, getPoolStripe } from '@/lib/design/competition';
 import { withLightness } from '@/lib/design/oklch';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
+import {
+  DEFAULT_DISCOVER_FILTERS,
+  type DiscoverFilters,
+  type DiscoverSort,
+} from '@/lib/discoverFilter';
 import {
   competitionOptions,
   DEFAULT_FILTERS,
@@ -71,7 +79,9 @@ import {
   showsTypeRow,
   typeOptions,
   withCompetition,
+  type CompetitionAndType,
   type FilterablePool,
+  type PoolIdentity,
   type PoolsFilters,
   type PoolType,
   type PredictionFilter,
@@ -92,6 +102,15 @@ type PoolsFilterSheetProps = {
   onChange: (next: PoolsFilters) => void;
 };
 
+type DiscoverFilterSheetProps = {
+  /** Every public pool Discover loaded. */
+  pools: PoolIdentity[];
+  filters: DiscoverFilters;
+  onChange: (next: DiscoverFilters) => void;
+};
+
+type SortOption<T extends string> = { value: T; label: string; icon: string; a11y: string };
+
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
@@ -106,11 +125,18 @@ const PICKS_OPTIONS: Array<{ value: PredictionFilter; label: string }> = [
 
 // "Joined" because that is what it sorts by — `pool_members.joined_at` — and
 // the old "Newest" read as the pool's age.
-const SORT_OPTIONS: Array<{ value: SortMode; label: string; icon: string; a11y: string }> = [
+const SORT_OPTIONS: Array<SortOption<SortMode>> = [
   { value: 'smart', label: 'Smart', icon: 'sparkles', a11y: 'Smart: pools waiting on your picks first, then most points' },
   { value: 'newest', label: 'Joined', icon: 'calendar', a11y: 'Recently joined first' },
   { value: 'name', label: 'Name', icon: 'textformat.abc', a11y: 'Name, A to Z' },
   { value: 'points', label: 'Points', icon: 'chart.xyaxis.line', a11y: 'Most points first' },
+];
+
+// Discover sorts pools you are not in: by who else is, by age, by name.
+const DISCOVER_SORT_OPTIONS: Array<SortOption<DiscoverSort>> = [
+  { value: 'popular', label: 'Popular', icon: 'person.2.fill', a11y: 'Most members first' },
+  { value: 'newest', label: 'Newest', icon: 'calendar', a11y: 'Newest pools first' },
+  { value: 'name', label: 'Name', icon: 'textformat.abc', a11y: 'Name, A to Z' },
 ];
 
 /** The create-pool flow's glyph for each game, so a game looks the same in both places. */
@@ -118,44 +144,9 @@ const TYPE_ICON: Record<PoolType, string> = Object.fromEntries(
   [...LEAGUE_MODE_OPTIONS, ...WC_MODES].map((m) => [m.value, m.icon]),
 ) as Record<PoolType, string>;
 
+/** My Pools: Status, Picks, Competition, Type, Sort. */
 export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle, PoolsFilterSheetProps>(
   function PoolsFilterSheet({ pools, filters, onChange }, ref) {
-    const theme = useTheme();
-    const insets = useSafeAreaInsets();
-    const sheetChrome = useSheetChrome('surface');
-    const sheetRef = useRef<BottomSheet | null>(null);
-    // Whether the Modal is up. The sheet inside mounts at index 0 and animates
-    // itself in; closing slides it out first and gorhom's `onClose` takes the
-    // Modal down after.
-    const [shown, setShown] = useState(false);
-    const close = useCallback(() => sheetRef.current?.close(), []);
-
-    useImperativeHandle(ref, () => ({
-      open: () => (shown ? sheetRef.current?.expand() : setShown(true)),
-      close,
-    }));
-
-    // ⚠ A WHISPER OF A BACKDROP, NOT NONE. The list behind is the preview, so it
-    // must stay readable — but a white sheet on the snow background with no
-    // separation at all loses its top edge. Still catches the tap that closes.
-    const renderBackdrop = useCallback(
-      (props: BottomSheetBackdropProps) => (
-        <BottomSheetBackdrop
-          {...props}
-          appearsOnIndex={0}
-          disappearsOnIndex={-1}
-          opacity={0.15}
-          pressBehavior="close"
-        />
-      ),
-      [],
-    );
-
-    const competitions = useMemo(() => competitionOptions(pools), [pools]);
-    const showCompetitions = useMemo(() => showsCompetitionRow(pools), [pools]);
-    const showTypes = useMemo(() => showsTypeRow(pools), [pools]);
-    const types = useMemo(() => typeOptions(pools, filters), [pools, filters]);
-
     const canReset =
       filters.status !== DEFAULT_FILTERS.status ||
       filters.type !== DEFAULT_FILTERS.type ||
@@ -164,182 +155,286 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle, PoolsFilterSh
       filters.sort !== DEFAULT_FILTERS.sort;
 
     return (
-      <Modal
-        visible={shown}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={close}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <BottomSheet
-            ref={sheetRef}
-            index={0}
-            animateOnMount
-            enableDynamicSizing
-            enablePanDownToClose
-            onClose={() => setShown(false)}
-            backdropComponent={renderBackdrop}
-            // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`.
-            {...sheetChrome}
-          >
-            {/* The sheet now reaches the bottom of the screen, so it clears the
-                home indicator itself — the tab bar used to do that for it. */}
-            <BottomSheetView
-              style={{
-                paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md,
-                gap: theme.spacing.lg,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingLeft: theme.spacing.xl,
-                  paddingRight: theme.spacing.lg,
-                }}
-              >
-                <Text style={{ fontFamily: fontFamilies.black, fontSize: 18, color: theme.colors.ink }}>
-                  Filter & sort
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-                  <Pressable
-                    onPress={() => onChange(DEFAULT_FILTERS)}
-                    disabled={!canReset}
-                    accessibilityRole="button"
-                    accessibilityLabel="Reset filters and sort"
-                    hitSlop={4}
-                    style={({ pressed }) => ({
-                      height: 40,
-                      justifyContent: 'center',
-                      paddingHorizontal: theme.spacing.md,
-                      borderRadius: 20,
-                      opacity: !canReset ? 0.4 : pressed ? 0.6 : 1,
-                    })}
-                  >
-                    <Text style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.slate }}>Reset</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={close}
-                    accessibilityRole="button"
-                    hitSlop={4}
-                    style={({ pressed }) => ({
-                      height: 40,
-                      justifyContent: 'center',
-                      paddingHorizontal: theme.spacing.lg,
-                      borderRadius: 20,
-                      borderCurve: 'continuous',
-                      backgroundColor: theme.colors.primary,
-                      opacity: pressed ? 0.8 : 1,
-                    })}
-                  >
-                    <Text style={{ fontFamily: fontFamilies.black, fontSize: 15, color: '#FFFFFF' }}>Done</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <SegmentedRow
-                label="Status"
-                options={STATUS_OPTIONS}
-                value={filters.status}
-                onChange={(status) => onChange({ ...filters, status })}
-              />
-              <SegmentedRow
-                label="Picks"
-                options={PICKS_OPTIONS}
-                value={filters.predictions}
-                onChange={(predictions) => onChange({ ...filters, predictions })}
-              />
-
-              {showCompetitions ? (
-                <Section label="Competition">
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm }}
-                  >
-                    {competitions.map((c) => (
-                      <CompetitionChip
-                        key={c.id}
-                        name={c.name}
-                        monogram={c.monogram}
-                        color={getCompetitionColor(c.id)}
-                        selected={filters.competition === c.id}
-                        onPress={() =>
-                          onChange(withCompetition(pools, filters, filters.competition === c.id ? 'all' : c.id))
-                        }
-                      />
-                    ))}
-                  </ScrollView>
-                </Section>
-              ) : null}
-
-              {showTypes ? (
-                <Section label="Type">
-                  <TypeTiles
-                    types={types}
-                    selected={filters.type}
-                    onPick={(t) => onChange({ ...filters, type: filters.type === t ? 'all' : t })}
-                  />
-                </Section>
-              ) : null}
-
-              <Section label="Sort">
-                <View style={{ flexDirection: 'row', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.xl }}>
-                  {SORT_OPTIONS.map((o) => {
-                    const selected = filters.sort === o.value;
-                    return (
-                      <Pressable
-                        key={o.value}
-                        haptic="selection"
-                        onPress={() => onChange({ ...filters, sort: o.value })}
-                        accessibilityRole="button"
-                        accessibilityLabel={o.a11y}
-                        accessibilityState={{ selected }}
-                        style={({ pressed }) => ({
-                          flex: 1,
-                          height: CONTROL_HEIGHT,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: theme.spacing.xs,
-                          borderRadius: CONTROL_RADIUS,
-                          borderWidth: SELECTION_BORDER,
-                          borderColor: selected ? theme.colors.primary : 'transparent',
-                          backgroundColor: selected
-                            ? withOpacity(theme.colors.primary, 0.12)
-                            : theme.colors.mist,
-                          opacity: pressed ? 0.7 : 1,
-                        })}
-                      >
-                        <Icon
-                          name={o.icon}
-                          size={15}
-                          color={selected ? 'primary' : 'slate'}
-                          weight="semibold"
-                        />
-                        <Text
-                          style={{
-                            fontFamily: selected ? fontFamilies.black : fontFamilies.bold,
-                            fontSize: 13,
-                            color: selected ? theme.colors.primary : theme.colors.ink,
-                          }}
-                        >
-                          {o.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </Section>
-            </BottomSheetView>
-          </BottomSheet>
-        </GestureHandlerRootView>
-      </Modal>
+      <FilterSheetShell ref={ref} canReset={canReset} onReset={() => onChange(DEFAULT_FILTERS)}>
+        <SegmentedRow
+          label="Status"
+          options={STATUS_OPTIONS}
+          value={filters.status}
+          onChange={(status) => onChange({ ...filters, status })}
+        />
+        <SegmentedRow
+          label="Picks"
+          options={PICKS_OPTIONS}
+          value={filters.predictions}
+          onChange={(predictions) => onChange({ ...filters, predictions })}
+        />
+        <CompetitionAndTypeRows pools={pools} filters={filters} onChange={onChange} />
+        <SortRow
+          options={SORT_OPTIONS}
+          value={filters.sort}
+          onChange={(sort) => onChange({ ...filters, sort })}
+        />
+      </FilterSheetShell>
     );
   },
 );
+
+/**
+ * Discover: Competition, Type, Sort.
+ *
+ * ⚠ NO STATUS OR PICKS — every pool here is open and not yours yet, so both
+ * would read the same on every row. See lib/discoverFilter.ts.
+ */
+export const DiscoverFilterSheet = forwardRef<PoolsFilterSheetHandle, DiscoverFilterSheetProps>(
+  function DiscoverFilterSheet({ pools, filters, onChange }, ref) {
+    const canReset =
+      filters.competition !== DEFAULT_DISCOVER_FILTERS.competition ||
+      filters.type !== DEFAULT_DISCOVER_FILTERS.type ||
+      filters.sort !== DEFAULT_DISCOVER_FILTERS.sort;
+
+    return (
+      <FilterSheetShell ref={ref} canReset={canReset} onReset={() => onChange(DEFAULT_DISCOVER_FILTERS)}>
+        <CompetitionAndTypeRows pools={pools} filters={filters} onChange={onChange} />
+        <SortRow
+          options={DISCOVER_SORT_OPTIONS}
+          value={filters.sort}
+          onChange={(sort) => onChange({ ...filters, sort })}
+        />
+      </FilterSheetShell>
+    );
+  },
+);
+
+/**
+ * The sheet itself: the Modal, the gesture root, the gorhom sheet and the
+ * "Filter & sort · Reset · Done" header. Both tabs' sheets are this plus rows.
+ */
+const FilterSheetShell = forwardRef<
+  PoolsFilterSheetHandle,
+  { canReset: boolean; onReset: () => void; children: ReactNode }
+>(function FilterSheetShell({ canReset, onReset, children }, ref) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const sheetChrome = useSheetChrome('surface');
+  const sheetRef = useRef<BottomSheet | null>(null);
+  // Whether the Modal is up. The sheet inside mounts at index 0 and animates
+  // itself in; closing slides it out first and gorhom's `onClose` takes the
+  // Modal down after.
+  const [shown, setShown] = useState(false);
+  const close = useCallback(() => sheetRef.current?.close(), []);
+
+  useImperativeHandle(ref, () => ({
+    open: () => (shown ? sheetRef.current?.expand() : setShown(true)),
+    close,
+  }));
+
+  // ⚠ A WHISPER OF A BACKDROP, NOT NONE. The list behind is the preview, so it
+  // must stay readable — but a white sheet on the snow background with no
+  // separation at all loses its top edge. Still catches the tap that closes.
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+        opacity={0.15}
+        pressBehavior="close"
+      />
+    ),
+    [],
+  );
+
+  return (
+    <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={close}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheet
+          ref={sheetRef}
+          index={0}
+          animateOnMount
+          enableDynamicSizing
+          enablePanDownToClose
+          onClose={() => setShown(false)}
+          backdropComponent={renderBackdrop}
+          // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`.
+          {...sheetChrome}
+        >
+          {/* The sheet reaches the bottom of the screen, so it clears the home
+              indicator itself — the tab bar used to do that for it. */}
+          <BottomSheetView
+            style={{
+              paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md,
+              gap: theme.spacing.lg,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingLeft: theme.spacing.xl,
+                paddingRight: theme.spacing.lg,
+              }}
+            >
+              <Text style={{ fontFamily: fontFamilies.black, fontSize: 18, color: theme.colors.ink }}>
+                Filter & sort
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                <Pressable
+                  onPress={onReset}
+                  disabled={!canReset}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset filters and sort"
+                  hitSlop={4}
+                  style={({ pressed }) => ({
+                    height: 40,
+                    justifyContent: 'center',
+                    paddingHorizontal: theme.spacing.md,
+                    borderRadius: 20,
+                    opacity: !canReset ? 0.4 : pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Text style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.slate }}>Reset</Text>
+                </Pressable>
+                <Pressable
+                  onPress={close}
+                  accessibilityRole="button"
+                  hitSlop={4}
+                  style={({ pressed }) => ({
+                    height: 40,
+                    justifyContent: 'center',
+                    paddingHorizontal: theme.spacing.lg,
+                    borderRadius: 20,
+                    borderCurve: 'continuous',
+                    backgroundColor: theme.colors.primary,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text style={{ fontFamily: fontFamilies.black, fontSize: 15, color: '#FFFFFF' }}>Done</Text>
+                </Pressable>
+              </View>
+            </View>
+            {children}
+          </BottomSheetView>
+        </BottomSheet>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+});
+
+/**
+ * Competition, then Type — one component because they depend on each other:
+ * a competition narrows the games, and choosing one drops a game it cannot
+ * have (`withCompetition`). Each row hides when it could only ever offer one
+ * option, decided over all the pools so the sheet keeps its shape.
+ */
+function CompetitionAndTypeRows<F extends CompetitionAndType>({
+  pools,
+  filters,
+  onChange,
+}: {
+  pools: PoolIdentity[];
+  filters: F;
+  onChange: (next: F) => void;
+}) {
+  const theme = useTheme();
+  const competitions = useMemo(() => competitionOptions(pools), [pools]);
+  const showCompetitions = useMemo(() => showsCompetitionRow(pools), [pools]);
+  const showTypes = useMemo(() => showsTypeRow(pools), [pools]);
+  const types = typeOptions(pools, filters);
+
+  return (
+    <>
+      {showCompetitions ? (
+        <Section label="Competition">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm }}
+          >
+            {competitions.map((c) => (
+              <CompetitionChip
+                key={c.id}
+                competitionId={c.id}
+                name={c.name}
+                monogram={c.monogram}
+                selected={filters.competition === c.id}
+                onPress={() =>
+                  onChange(withCompetition(pools, filters, filters.competition === c.id ? 'all' : c.id))
+                }
+              />
+            ))}
+          </ScrollView>
+        </Section>
+      ) : null}
+
+      {showTypes ? (
+        <Section label="Type">
+          <TypeTiles
+            types={types}
+            selected={filters.type}
+            onPick={(t) => onChange({ ...filters, type: filters.type === t ? 'all' : t })}
+          />
+        </Section>
+      ) : null}
+    </>
+  );
+}
+
+/** The sort buttons, sharing the row equally — four on My Pools, three on Discover. */
+function SortRow<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: Array<SortOption<T>>;
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Section label="Sort">
+      <View style={{ flexDirection: 'row', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.xl }}>
+        {options.map((o) => {
+          const selected = value === o.value;
+          return (
+            <Pressable
+              key={o.value}
+              haptic="selection"
+              onPress={() => onChange(o.value)}
+              accessibilityRole="button"
+              accessibilityLabel={o.a11y}
+              accessibilityState={{ selected }}
+              style={({ pressed }) => ({
+                flex: 1,
+                height: CONTROL_HEIGHT,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: theme.spacing.xs,
+                borderRadius: CONTROL_RADIUS,
+                borderWidth: SELECTION_BORDER,
+                borderColor: selected ? theme.colors.primary : 'transparent',
+                backgroundColor: selected ? withOpacity(theme.colors.primary, 0.12) : theme.colors.mist,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Icon name={o.icon} size={15} color={selected ? 'primary' : 'slate'} weight="semibold" />
+              <Text
+                style={{
+                  fontFamily: selected ? fontFamilies.black : fontFamilies.bold,
+                  fontSize: 13,
+                  color: selected ? theme.colors.primary : theme.colors.ink,
+                }}
+              >
+                {o.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Section>
+  );
+}
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
   const theme = useTheme();
@@ -454,26 +549,30 @@ function SegmentedRow<T extends string>({
 }
 
 /**
- * A competition: its monogram in a disc of its colour, then its name.
+ * A competition: its monogram on a disc, then its name.
  *
- * The disc is BADGE_RADIUS inside the chip's inner edge — concentric. It is a
- * monogram and not the competition's mark because the league marks came out of
- * the app on 2026-09-19 (see `MARK_PNG` in lib/design/competition.ts).
+ * The disc is BADGE_RADIUS inside the chip's inner edge — concentric. It wears
+ * the competition's stripe gradient, the same one as the card's rail and the
+ * Results tab's competition picker, so a competition looks like itself
+ * everywhere. A monogram and not the competition's mark because the league
+ * marks came out of the app on 2026-09-19 (see `MARK_PNG` in
+ * lib/design/competition.ts).
  */
 function CompetitionChip({
+  competitionId,
   name,
   monogram,
-  color,
   selected,
   onPress,
 }: {
+  competitionId: number;
   name: string;
   monogram: string;
-  color: string;
   selected: boolean;
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const color = getCompetitionColor(competitionId);
   // The Premier League's purple disappears on a dark sheet; the ring is lifted
   // to a lightness that reads there, the disc keeps the true colour.
   const ring = theme.mode === 'dark' ? withLightness(color, 0.72) : color;
@@ -498,18 +597,22 @@ function CompetitionChip({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View
+      <LinearGradient
+        colors={getPoolStripe(competitionId)}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
         style={{
           width: BADGE_SIZE,
           height: BADGE_SIZE,
           borderRadius: BADGE_RADIUS,
-          backgroundColor: color,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontFamily: fontFamilies.black, fontSize: 11, color: '#FFFFFF' }}>{monogram}</Text>
-      </View>
+        <Text style={{ fontFamily: fontFamilies.black, fontSize: 11, lineHeight: 14, color: '#FFFFFF' }}>
+          {monogram}
+        </Text>
+      </LinearGradient>
       <Text
         style={{
           fontFamily: selected ? fontFamilies.black : fontFamilies.bold,

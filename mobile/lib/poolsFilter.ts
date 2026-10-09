@@ -67,6 +67,16 @@ export type FilterablePool = Pick<
   | 'totalPoints'
 >;
 
+/**
+ * What the competition and game rules need to know about a pool — shared by
+ * My Pools and Discover (lib/discoverFilter.ts), whose pools are otherwise
+ * different shapes.
+ */
+export type PoolIdentity = Pick<FilterablePool, 'predictionMode' | 'leagueMode' | 'externalLeagueId'>;
+
+/** The two axes that depend on each other, on either tab. */
+export type CompetitionAndType = { competition: CompetitionFilter; type: TypeFilter };
+
 const BRACKET_TYPES = new Set<string>(['full_tournament', 'progressive', 'bracket_picker']);
 
 /**
@@ -87,7 +97,7 @@ export const POOL_TYPE_ORDER: readonly PoolType[] = [
  * the card's pill and the web both use (three production pools carry NULL
  * there and all three are Pick'em).
  */
-export function poolTypeOf(pool: Pick<FilterablePool, 'predictionMode' | 'leagueMode'>): PoolType | null {
+export function poolTypeOf(pool: Pick<PoolIdentity, 'predictionMode' | 'leagueMode'>): PoolType | null {
   if (isLeaguePoolMode(pool.predictionMode)) {
     return (LEAGUE_MODES as readonly string[]).includes(pool.leagueMode ?? '')
       ? (pool.leagueMode as LeagueMode)
@@ -183,7 +193,7 @@ function titleCase(name: string): string {
  * from the row beside it. A competition nobody has named yet has no chip — its
  * pools still show under "all".
  */
-export function competitionOptions(pools: FilterablePool[]): CompetitionOption[] {
+export function competitionOptions(pools: PoolIdentity[]): CompetitionOption[] {
   const seen = new Map<number, CompetitionOption>();
   for (const p of pools) {
     const id = p.externalLeagueId;
@@ -207,7 +217,7 @@ export function competitionOptions(pools: FilterablePool[]): CompetitionOption[]
  *
  * The selected game is always offered, so it can always be tapped off.
  */
-export function typeOptions(pools: FilterablePool[], filters: PoolsFilters): PoolType[] {
+export function typeOptions(pools: PoolIdentity[], filters: CompetitionAndType): PoolType[] {
   const present = new Set<PoolType>();
   for (const p of pools) {
     if (filters.competition !== 'all' && p.externalLeagueId !== filters.competition) continue;
@@ -223,12 +233,12 @@ export function typeOptions(pools: FilterablePool[], filters: PoolsFilters): Poo
  * narrow anything. Decided over ALL the member's pools, for the same reason as
  * `competitionOptions` — the sheet keeps its shape while it is being used.
  */
-export function showsCompetitionRow(pools: FilterablePool[]): boolean {
+export function showsCompetitionRow(pools: PoolIdentity[]): boolean {
   return competitionOptions(pools).length >= 2;
 }
 
-export function showsTypeRow(pools: FilterablePool[]): boolean {
-  return typeOptions(pools, DEFAULT_FILTERS).length >= 2;
+export function showsTypeRow(pools: PoolIdentity[]): boolean {
+  return typeOptions(pools, { competition: 'all', type: 'all' }).length >= 2;
 }
 
 /**
@@ -240,11 +250,11 @@ export function showsTypeRow(pools: FilterablePool[]): boolean {
  * The tile they chose disappears with the reason in plain sight: the
  * competition they just tapped.
  */
-export function withCompetition(
-  pools: FilterablePool[],
-  filters: PoolsFilters,
+export function withCompetition<F extends CompetitionAndType>(
+  pools: PoolIdentity[],
+  filters: F,
   competition: CompetitionFilter,
-): PoolsFilters {
+): F {
   const next = { ...filters, competition };
   if (next.type === 'all') return next;
   const available = typeOptions(pools, { ...next, type: 'all' });
