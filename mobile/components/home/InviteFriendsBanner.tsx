@@ -1,19 +1,21 @@
 import { Share, View } from 'react-native';
 
-import { Button, Icon, Text } from '@/components/ui';
+import { Button, Icon, Pressable, Text } from '@/components/ui';
 import type { PoolSummary } from '@/lib/useHomeData';
 import { useTheme, withOpacity } from '@/theme';
 
 type InviteFriendsBannerProps = {
   pool: PoolSummary;
+  /** The ×. Closes the card for this pool for good (lib/inviteCard.ts). */
+  onClose: () => void;
 };
 
-export function InviteFriendsBanner({ pool }: InviteFriendsBannerProps) {
+export function InviteFriendsBanner({ pool, onClose }: InviteFriendsBannerProps) {
   const theme = useTheme();
 
   async function handleShare() {
     const url = `https://sportpool.io/join/${pool.poolCode}`;
-    const message = `Join my World Cup prediction pool on SportPool!\n\n${url}`;
+    const message = `Join my prediction pool on SportPool!\n\n${url}`;
     try {
       await Share.share({ message, url });
     } catch {
@@ -39,6 +41,26 @@ export function InviteFriendsBanner({ pool }: InviteFriendsBannerProps) {
             competitive
           </Text>
         </View>
+        {/* The notifications-off card's ×, so the two close the same way. */}
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          accessibilityHint={`Stops suggesting invites for ${pool.poolName}`}
+          style={({ pressed }) => ({
+            alignSelf: 'flex-start',
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.mist,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Icon name="xmark" tint={theme.colors.slate} size={11} weight="bold" />
+        </Pressable>
       </View>
       <Button title="Share Invite" size="md" fullWidth onPress={handleShare} />
     </View>

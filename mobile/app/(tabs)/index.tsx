@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,8 +26,10 @@ import {
 import { PushAskGate } from '@/components/notifications';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { homeMatchesFrom } from '@/lib/homeMatches';
+import { pickInviteTarget } from '@/lib/inviteCard';
 import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
 import type { PoolSummary } from '@/lib/useHomeData';
+import { closeInviteCard, useClosedInviteCards } from '@/lib/useInviteCard';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { useTheme } from '@/theme';
@@ -95,19 +97,19 @@ export default function HomeScreen() {
   const pools = data?.pools ?? [];
   const hasPools = pools.length > 0;
   const poolsNeedingPredictions = pools.filter((p) => p.needsPredictions);
-  // Hide the "Share Invite" card once the pool's tournament is underway —
-  // predictions are locked by then, so there's no point inviting new members.
-  // "Started" = the prediction deadline (first kickoff) has passed, or scoring
-  // has already begun.
-  const now = Date.now();
-  const inviteTarget =
-    pools.find((p) => {
-      if (p.role !== 'admin' || p.memberCount >= 4) return false;
-      const tournamentStarted =
-        p.hasScoringStarted ||
-        (p.predictionDeadline != null && Date.parse(p.predictionDeadline) <= now);
-      return !tournamentStarted;
-    }) ?? null;
+  // The "needs more players" card: the first small, not-yet-started pool you
+  // run whose card you haven't closed on this phone (lib/inviteCard.ts).
+  const closedInviteCards = useClosedInviteCards();
+  const inviteTarget = pickInviteTarget(pools, closedInviteCards, Date.now());
+  // ⚠ Closing it empties the slot until you next come back to Home. Another
+  // pool that qualifies gets the card then — not in the same instant, where it
+  // would land under your thumb and read as the × not having worked.
+  const [inviteClosedThisVisit, setInviteClosedThisVisit] = useState(false);
+  useFocusEffect(useCallback(() => () => setInviteClosedThisVisit(false), []));
+  const closeInvite = useCallback((poolId: string) => {
+    setInviteClosedThisVisit(true);
+    void closeInviteCard(poolId);
+  }, []);
 
   return (
     <SafeAreaView
@@ -193,7 +195,9 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {inviteTarget ? <InviteFriendsBanner pool={inviteTarget} /> : null}
+        {inviteTarget && !inviteClosedThisVisit ? (
+          <InviteFriendsBanner pool={inviteTarget} onClose={() => closeInvite(inviteTarget.poolId)} />
+        ) : null}
 
         {homeMatches.upcoming.length > 0 ? (
           <View style={{ gap: theme.spacing.md }}>
