@@ -114,9 +114,48 @@ function parseFeels(): Parsed[] {
   });
 }
 
+/**
+ * The declared aliases, parsed out of the module.
+ *
+ * ⚠ ELEVEN FEELS DO NOT FIT. iOS expresses nine single-shot feels and Android
+ * below API 30 expresses eight, so sharing is forced. The invariant is
+ * therefore not "never share" — it is "share only where the table SAYS SO".
+ */
+function parseAliases(): { pair: [string, string]; platform: string; upTo: number }[] {
+  const start = src.indexOf('export const DECLARED_ALIASES');
+  expect(start, 'DECLARED_ALIASES should still be exported').toBeGreaterThan(-1);
+  const body = src.slice(start, src.indexOf('\n];', start));
+  const out: { pair: [string, string]; platform: string; upTo: number }[] = [];
+  const re = /feels: \['(\w+)', '(\w+)'\],\s*\n\s*platform: '(\w+)',(?:\s*\n\s*upTo: (\d+),)?/g;
+  for (let m = re.exec(body); m !== null; m = re.exec(body)) {
+    out.push({
+      pair: [m[1], m[2]],
+      platform: m[3],
+      // No `upTo` means it holds at every level (the iOS entries).
+      upTo: m[4] ? Number(m[4]) : Number.POSITIVE_INFINITY,
+    });
+  }
+  expect(out.length, 'no aliases parsed — the shape of DECLARED_ALIASES changed').toBeGreaterThan(0);
+  return out;
+}
+
 /** Mirrors `resolveAndroidRung` in the module under test. */
 function rungAt(rungs: Rung[], api: number): Rung {
   return rungs.find((r) => api >= r.minApi) ?? rungs[rungs.length - 1];
+}
+
+/** Collisions the table declares, as the `a + b` key `duplicates` reports. */
+function allowed(platform: 'ios' | 'android', api: number): Set<string> {
+  return new Set(
+    parseAliases()
+      .filter((a) => a.platform === platform && api <= a.upTo)
+      // `duplicates` joins names in table order, so both orders are allowed.
+      .flatMap((a) => [`${a.pair[0]} + ${a.pair[1]}`, `${a.pair[1]} + ${a.pair[0]}`]),
+  );
+}
+
+function undeclared(found: string[], ok: Set<string>): string[] {
+  return found.filter((f) => !ok.has(f.split(' both resolve to ')[0]));
 }
 
 function duplicates(pairs: { name: string; call: string }[]): string[] {
@@ -131,17 +170,25 @@ describe('the haptics table', () => {
   const feels = parseFeels();
 
   it('parses every export in the module', () => {
-    const exported = [...src.matchAll(/^export function haptic(\w+)\(/gm)].map(
-      (m) => m[1][0].toLowerCase() + m[1].slice(1),
-    );
-    // Every `hapticX` export must have a matching table entry and vice versa —
-    // an export with no entry would throw at runtime on its first tap.
+    // ⚠ DISPATCHERS, NOT FEELS. `hapticToggle(on)` picks between two entries
+    // rather than naming one, so it has no table row and cannot have one. It is
+    // listed here BY NAME for the same reason the aliases are written down: an
+    // exception that is declared stays reviewable, and the rule stays absolute
+    // for everything else. A new `hapticX` with no entry would throw on its
+    // first tap, which is what this test is really protecting.
+    const DISPATCHERS = ['toggle'];
+    const exported = [...src.matchAll(/^export function haptic(\w+)\(/gm)]
+      .map((m) => m[1][0].toLowerCase() + m[1].slice(1))
+      .filter((name) => !DISPATCHERS.includes(name));
     expect([...exported].sort()).toEqual([...feels.map((f) => f.name)].sort());
   });
 
-  it('gives every feel a distinct call on iOS', () => {
-    // ⚠ THE ORIGINAL BUG. `selection` and `press` both read `selectionAsync()`.
-    expect(duplicates(feels.map((f) => ({ name: f.name, call: f.ios })))).toEqual([]);
+  it('shares an iOS call only where the table declares it', () => {
+    // ⚠ THE ORIGINAL BUG was `selection` and `press` both reading
+    // `selectionAsync()` with nobody having decided it. Sharing is now legal,
+    // but only in DECLARED_ALIASES — an undeclared one still fails here.
+    const found = duplicates(feels.map((f) => ({ name: f.name, call: f.ios })));
+    expect(undeclared(found, allowed('ios', 0))).toEqual([]);
   });
 
   // 24 is below every gate (the floor, whatever Expo's template sets), 30 adds
@@ -154,8 +201,8 @@ describe('the haptics table', () => {
         return { name: f.name, call: r.pattern ? `pattern:${r.pattern}` : `constant:${r.constant}` };
       });
       // ⚠ THE OTHER ORIGINAL BUG, which only showed below 34: `dragStart` and
-      // `longPress` both landed on Long_Press.
-      expect(duplicates(pairs)).toEqual([]);
+      // `longPress` both landed on Long_Press — undeclared.
+      expect(undeclared(duplicates(pairs), allowed('android', api))).toEqual([]);
     });
   }
 
@@ -182,6 +229,33 @@ describe('the haptics table', () => {
         [...apis].sort((a, b) => b - a),
         `feel \`${f.name}\`'s ladder is out of order — \`resolveAndroidRung\` takes the FIRST match, so a low rung above a high one shadows it`,
       ).toEqual(apis);
+    }
+  });
+
+  it('declares no alias that is not a real collision', () => {
+    // ⚠ CHECKED BOTH WAYS so the list cannot rot. An entry that no longer
+    // describes a collision — because a constant was freed up, or a feel was
+    // retimed — is a stale excuse, and stale excuses are how a guard stops
+    // guarding. Delete it rather than leaving it to cover a future accident.
+    for (const alias of parseAliases()) {
+      const [a, b] = alias.pair;
+      const fa = feels.find((f) => f.name === a);
+      const fb = feels.find((f) => f.name === b);
+      expect(fa, `alias names \`${a}\`, which is not in the table`).toBeDefined();
+      expect(fb, `alias names \`${b}\`, which is not in the table`).toBeDefined();
+
+      if (alias.platform === 'ios') {
+        expect(fa!.ios, `ios alias \`${a}\` + \`${b}\` is stale — they differ now`).toBe(fb!.ios);
+      } else {
+        // Check at the level the declaration claims it bites.
+        const api = alias.upTo === Number.POSITIVE_INFINITY ? 24 : alias.upTo;
+        const ra = rungAt(fa!.android, api);
+        const rb = rungAt(fb!.android, api);
+        expect(
+          ra.pattern ? `p:${ra.pattern}` : `c:${ra.constant}`,
+          `android alias \`${a}\` + \`${b}\` is stale at API ${api} — they differ now`,
+        ).toBe(rb.pattern ? `p:${rb.pattern}` : `c:${rb.constant}`);
+      }
     }
   });
 

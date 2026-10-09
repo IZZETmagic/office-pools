@@ -53,6 +53,21 @@ const PAIRS: { a: FeelName; b: FeelName; question: string }[] = [
     question: 'Picking a row up vs opening a menu. Two things, or one?',
   },
   {
+    a: 'toggleOn',
+    b: 'toggleOff',
+    question: 'On vs off. Heavy against Soft — a thunk, then a give?',
+  },
+  {
+    a: 'dragStart',
+    b: 'dragEnd',
+    question: 'Picked up vs put down. Below Android 30 these are one feel by design.',
+  },
+  {
+    a: 'selection',
+    b: 'keyTick',
+    question: 'Same on iOS, on purpose. On Android the second should be a keyboard tap.',
+  },
+  {
     a: 'success',
     b: 'failure',
     question: 'Saved vs refused. Could you tell which without the screen?',

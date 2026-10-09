@@ -11,6 +11,7 @@ import {
   formatResetCode,
   normalizeResetCode,
 } from '@/lib/passwordReset';
+import { hapticFailure, hapticKeyTick, hapticSuccess } from '@/lib/haptics';
 import { useTheme } from '@/theme';
 
 /**
@@ -45,14 +46,24 @@ export default function ResetCodeScreen() {
     setVerifying(true);
     const result = await verifyResetCode(email, value);
     if (result.error) {
+      // ⚠ The field CLEARS on a bad code, so the only other signal that
+      // anything happened is six digits vanishing. Worth a buzz.
+      hapticFailure();
       setVerifying(false);
       setError(result.error);
       setCode('');
+    } else {
+      hapticSuccess();
     }
   }
 
   function handleChange(text: string) {
     const next = normalizeResetCode(text);
+    // ⚠ ONLY WHEN THE CODE GETS LONGER. `handleChange` fires on deletes and on
+    // a paste too; ticking per keystroke regardless would buzz backwards while
+    // someone corrects a typo, and fire once for an autofilled code that
+    // arrived whole rather than six times.
+    if (next.length === code.length + 1) hapticKeyTick();
     setCode(next);
     // A full code submits itself — which is what an autofilled code from Mail
     // looks like, so the person never has to find the button.

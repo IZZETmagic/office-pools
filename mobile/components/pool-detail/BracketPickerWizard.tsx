@@ -32,7 +32,7 @@ import {
   type Match,
   type Team,
 } from '@/lib/bracket/tournament';
-import { hapticDragStart, hapticSelection } from '@/lib/haptics';
+import { hapticDragEnd, hapticDragStart, hapticSelection } from '@/lib/haptics';
 import { useBracketPickerPredictions } from '@/lib/useBracketPickerPredictions';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -120,6 +120,10 @@ function triggerPickupHaptic() {
 
 function triggerSlotCrossHaptic() {
   hapticSelection();
+}
+
+function triggerDropHaptic() {
+  hapticDragEnd();
 }
 
 type Props = {
@@ -1758,6 +1762,13 @@ function GroupRankingCard({
     runOnJS(triggerSlotCrossHaptic)();
   }, []);
 
+  // ⭐ The landing — see TablePicker, which this picker's drag haptics are the
+  // precedent for. Same worklet/runOnJS shape as the two above.
+  const handleDragEnd = useCallback(() => {
+    'worklet';
+    runOnJS(triggerDropHaptic)();
+  }, []);
+
   return (
     <View
       style={{
@@ -1832,6 +1843,7 @@ function GroupRankingCard({
           )}
           onReorder={handleReorder}
           onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
           onIndexChange={handleIndexChange}
           scrollable={false}
           dragEnabled={!disabled}
@@ -1937,6 +1949,13 @@ function ThirdPlaceCard({
     runOnJS(triggerSlotCrossHaptic)();
   }, []);
 
+  // ⭐ The landing — see TablePicker, which this picker's drag haptics are the
+  // precedent for. Same worklet/runOnJS shape as the two above.
+  const handleDragEnd = useCallback(() => {
+    'worklet';
+    runOnJS(triggerDropHaptic)();
+  }, []);
+
   if (teams.length === 0) {
     return (
       <View
@@ -2029,6 +2048,7 @@ function ThirdPlaceCard({
           )}
           onReorder={handleReorder}
           onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
           onIndexChange={handleIndexChange}
           scrollable={false}
           dragEnabled={!disabled}

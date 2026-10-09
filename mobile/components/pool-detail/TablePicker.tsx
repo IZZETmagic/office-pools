@@ -12,7 +12,7 @@ import {
 import { ClubBar, Icon, Text } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
 import { useSharedActivity } from '@/lib/ActivityProvider';
-import { hapticDragStart, hapticSelection } from '@/lib/haptics';
+import { hapticDragEnd, hapticDragStart, hapticSelection } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -170,6 +170,20 @@ export function TablePicker({
     runOnJS(hapticSelection)();
   }, []);
 
+  /**
+   * ⭐ THE LANDING. `handleDragStart` says "I have it" and the ticks above say
+   * "you have moved a slot", but nothing said "it is down" — on twenty clubs
+   * that is the beat that tells you to lift your thumb.
+   *
+   * ⚠ Same `runOnJS` hop and the same reason as `handleDragStart`: this is a
+   * worklet, and a bare call would try to serialise the native module onto the
+   * UI thread.
+   */
+  const handleDragEnd = useCallback(() => {
+    'worklet';
+    runOnJS(hapticDragEnd)();
+  }, []);
+
   const rows = useMemo(
     () => order.map((id, i) => ({ club: byId.get(id)!, position: i + 1 })).filter((r) => r.club),
     [order, byId],
@@ -218,6 +232,7 @@ export function TablePicker({
         keyExtractor={(r) => r.club.club_id}
         onReorder={handleReorder}
         onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onIndexChange={handleIndexChange}
         // The library's own way to refuse a drag — not an absent handler.
         dragEnabled={!locked}

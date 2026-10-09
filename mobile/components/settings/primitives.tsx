@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { hapticToggle } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // LayoutAnimation needs switching on once for Android (as GroupCollapsibleSection does).
@@ -182,7 +183,16 @@ export function NotificationRow({
           ) : (
             <Switch
               value={enabled}
-              onValueChange={onToggle}
+              // ⭐ The ONE control where the two directions should not feel
+              // alike — you should be able to tell which way you moved it
+              // without looking. `value` is the switch's state BEFORE this
+              // change on some platforms and after on others, so the feel is
+              // taken from the value RN hands the callback, never from
+              // `enabled`.
+              onValueChange={(next) => {
+                hapticToggle(next);
+                onToggle();
+              }}
               accessibilityLabel={option.label}
               trackColor={{ false: theme.colors.mist, true: theme.colors.primary }}
             />

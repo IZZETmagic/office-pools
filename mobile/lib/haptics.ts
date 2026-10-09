@@ -130,6 +130,22 @@ const FEELS = {
   },
 
   /**
+   * One digit of a code — the 6-figure password reset field.
+   *
+   * ⚠ DELIBERATELY THE SAME AS `selection` ON iOS, declared in
+   * DECLARED_ALIASES. iOS has exactly one selection generator and a code digit
+   * is a selection; there is no finer grain to reach for. Android DOES have a
+   * finer grain — `Keyboard_Tap` is the constant a soft keyboard uses, which is
+   * literally what this is — so the two platforms are not equally expressive
+   * here and the table says so rather than pretending.
+   */
+  keyTick: {
+    purpose: 'One digit of a code arrived',
+    ios: { kind: 'selection' },
+    android: [{ constant: A.Keyboard_Tap }],
+  },
+
+  /**
    * A discrete press of a control — a tab, a segment, a matchweek arrow.
    *
    * ⚠⚠ `Rigid`, NOT `selectionAsync`. This used to be `selectionAsync()`,
@@ -142,6 +158,30 @@ const FEELS = {
     purpose: 'A discrete control — a tab, a matchweek arrow',
     ios: { kind: 'impact', style: IMPACT.Rigid },
     android: [{ constant: A.Context_Click }],
+  },
+
+  /**
+   * A switch went ON.
+   *
+   * ⭐⭐ THE PAIR IS THE POINT. A switch is the one control where the two
+   * DIRECTIONS should not feel alike — you should be able to tell, without
+   * looking, which way you just moved it. Android ships the exact constants for
+   * it; on iOS the pair is Heavy against Soft, a thunk against a give, which is
+   * a difference in TEXTURE rather than volume.
+   *
+   * ⚠ Heavy and Soft were the last two unused iOS calls. There is no tenth.
+   */
+  toggleOn: {
+    purpose: 'A switch went on',
+    ios: { kind: 'impact', style: IMPACT.Heavy },
+    android: [{ minApi: 34, constant: A.Toggle_On }, { constant: A.Context_Click }],
+  },
+
+  /** A switch went OFF. @see FEELS.toggleOn */
+  toggleOff: {
+    purpose: 'A switch went off',
+    ios: { kind: 'impact', style: IMPACT.Soft },
+    android: [{ minApi: 34, constant: A.Toggle_Off }, { constant: A.Clock_Tick }],
   },
 
   /**
@@ -165,6 +205,24 @@ const FEELS = {
       { minApi: 30, constant: A.Gesture_Start },
       { constant: A.Virtual_Key },
     ],
+  },
+
+  /**
+   * The row landed — the drag is over and the order is what you see.
+   *
+   * ⭐ A DRAG HAD A PICKUP AND NO LANDING. `dragStart` says "I have it" and
+   * `selection` ticks per slot crossed, but nothing said "it is down". On a
+   * twenty-club table that is the one beat that tells you to lift your thumb.
+   *
+   * ⚠ Below API 30 Android has no gesture-end constant and all five
+   * always-safe ones are spoken for, so this aliases `dragStart` there —
+   * declared, and the least harmful alias available: both ends of one drag feel
+   * the same, which is worse than a distinct landing but better than silence.
+   */
+  dragEnd: {
+    purpose: 'The row landed and the drag is over',
+    ios: { kind: 'impact', style: IMPACT.Soft },
+    android: [{ minApi: 30, constant: A.Gesture_End }, { constant: A.Virtual_Key }],
   },
 
   /**
@@ -211,6 +269,69 @@ const FEELS = {
 } as const satisfies Record<string, Feel>;
 
 export type FeelName = keyof typeof FEELS;
+
+// -------------------------------------------------------------
+// Declared aliases — where the platform simply runs out
+// -------------------------------------------------------------
+// ⭐⭐ THE CEILING IS ARITHMETIC, NOT A CHOICE. iOS can express exactly NINE
+// single-shot feels: one selection generator, five impact weights, three
+// notification patterns. Android below API 30 can express eight: the five
+// constants `HapticsRecord.kt` can always resolve, plus the same three
+// patterns. There are eleven feels in the table above. Something has to share.
+//
+// ⭐⭐ SO A SHARED CALL MUST BE A DECISION. The bug this whole file was
+// restructured around was two feels landing on one call with nobody having
+// decided it and nobody noticing — `selection`/`press` on iOS, which made a
+// deliberate design in the pickem screen a no-op on every iPhone. The fix is
+// not "never share", which is now impossible; it is "share only on purpose, in
+// writing". `haptics.guard.test.ts` subtracts this list from the collisions it
+// finds and fails on the remainder — so an ACCIDENT still fails the build,
+// while a decision is recorded where the next person will read it.
+//
+// ⚠ IT IS CHECKED BOTH WAYS. A declaration that no longer describes a real
+// collision also fails, so this list cannot rot into a list of excuses for
+// collisions that stopped existing.
+//
+// ⭐ Nothing is aliased at API 34 and above: all eleven are distinct there.
+// Every entry below is a statement about an OLDER device or about iOS.
+type DeclaredAlias = {
+  feels: [FeelName, FeelName];
+  platform: 'ios' | 'android';
+  /** Android only: the alias exists at or below this API level. */
+  upTo?: number;
+  why: string;
+};
+
+export const DECLARED_ALIASES: DeclaredAlias[] = [
+  {
+    feels: ['selection', 'keyTick'],
+    platform: 'ios',
+    why: 'iOS has one selection generator and a code digit IS a selection. Android gets Keyboard_Tap, which is exact, so only iOS is short.',
+  },
+  {
+    feels: ['dragEnd', 'toggleOff'],
+    platform: 'ios',
+    why: 'Both are a release settling. Soft was the last free impact weight, and the two never appear on the same screen — a settings switch and a drag landing cannot be confused for one another.',
+  },
+  {
+    feels: ['press', 'toggleOn'],
+    platform: 'android',
+    upTo: 33,
+    why: 'Toggle_On is API 34+. A switch flipping on is a discrete control press, so Context_Click is the honest stand-in below that.',
+  },
+  {
+    feels: ['selection', 'toggleOff'],
+    platform: 'android',
+    upTo: 33,
+    why: 'Toggle_Off is API 34+. Off is the lighter half of the pair, so it falls to the lightest constant available.',
+  },
+  {
+    feels: ['dragStart', 'dragEnd'],
+    platform: 'android',
+    upTo: 29,
+    why: 'Gesture_End is API 30+ and all five always-safe constants are spoken for. Both ends of one drag feel alike on these devices — worse than a distinct landing, better than silence.',
+  },
+];
 
 /**
  * The first rung this device satisfies. Exported for the guard test, which
@@ -263,14 +384,39 @@ export function hapticSelection(): void {
   play('selection');
 }
 
+/** @see FEELS.keyTick */
+export function hapticKeyTick(): void {
+  play('keyTick');
+}
+
 /** @see FEELS.press */
 export function hapticPress(): void {
   play('press');
 }
 
+/** @see FEELS.toggleOn */
+export function hapticToggleOn(): void {
+  play('toggleOn');
+}
+
+/** @see FEELS.toggleOff */
+export function hapticToggleOff(): void {
+  play('toggleOff');
+}
+
+/** Convenience for a switch: the direction picks the feel. @see FEELS.toggleOn */
+export function hapticToggle(on: boolean): void {
+  play(on ? 'toggleOn' : 'toggleOff');
+}
+
 /** @see FEELS.dragStart */
 export function hapticDragStart(): void {
   play('dragStart');
+}
+
+/** @see FEELS.dragEnd */
+export function hapticDragEnd(): void {
+  play('dragEnd');
 }
 
 /** @see FEELS.longPress */
