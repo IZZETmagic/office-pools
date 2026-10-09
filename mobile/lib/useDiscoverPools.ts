@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
+import { seasonClocks, type MatchweekRow, type SeasonClock } from './discoverCard';
 import { supabase } from './supabase';
 
 export type DiscoverPool = {
@@ -15,6 +16,10 @@ export type DiscoverPool = {
    * why every league pool here used to wear the word "Pool" in World Cup blue.
    */
   leagueMode: string | null;
+  /** `pools.league_depth`: 'results' is pick a winner; anything else, NULL included, is predict the score. */
+  leagueDepth: string | null;
+  leagueStartMatchweek: number | null;
+  leagueTableLockAt: string | null;
   /** `tournaments.external_league_id` — the key for the competition's name and colour. */
   externalLeagueId: number | null;
   createdAt: string;
@@ -24,20 +29,73 @@ export type DiscoverPool = {
   status: string;
   predictionDeadline: string | null;
   memberCount: number;
-  alreadyJoined: boolean;
+  /** The admin's username, else their full name — see `adminNameOf`. */
+  adminName: string | null;
+  /** Where the pool's league season is. Null for a tournament pool. */
+  seasonClock: SeasonClock | null;
 };
 
-/**
- * Public pools you could join.
- *
- * ⚠ `enabled` KEEPS IT LAZY. The hook now lives on the Pools screen — the
- * filter sheet and the "Showing X of Y" line need the list as well as the cards
- * — but a load is one query per pool for member counts, and most visits to the
- * tab never open Discover. It loads the first time `enabled` is true and keeps
- * what it has after that.
- */
 type TournamentEmbed = { external_league_id: number | null };
+type AdminEmbed = { username: string | null; full_name: string | null };
 
+type PoolRow = {
+  pool_id: string;
+  pool_name: string;
+  pool_code: string;
+  description: string | null;
+  prediction_mode: string | null;
+  league_mode: string | null;
+  league_depth: string | null;
+  league_start_matchweek: number | null;
+  league_table_lock_at: string | null;
+  league_season_id: string | null;
+  brand_name: string | null;
+  brand_emoji: string | null;
+  brand_color: string | null;
+  status: string;
+  prediction_deadline: string | null;
+  created_at: string;
+  // Many-to-one embeds come back as an OBJECT, but the typed client infers an
+  // array — so both shapes are accepted, and `one()` reads either.
+  tournaments: TournamentEmbed | TournamentEmbed[] | null;
+  admin: AdminEmbed | AdminEmbed[] | null;
+};
+
+function one<T>(embed: T | T[] | null): T | null {
+  return Array.isArray(embed) ? (embed[0] ?? null) : embed;
+}
+
+/**
+ * Who runs the pool, as a stranger deciding whether to join should see them.
+ *
+ * ⭐ THE USERNAME FIRST, the full name only when there is none — the same order
+ * as the Showdown leaderboard. A public pool is shown to people its admin has
+ * never met, and a handle says less about them than a real name does.
+ */
+function adminNameOf(admin: AdminEmbed | null): string | null {
+  const username = admin?.username?.trim();
+  if (username) return username;
+  return admin?.full_name?.trim() || null;
+}
+
+/**
+ * Public pools you could join — and ONLY those.
+ *
+ * ⚠ POOLS YOU ARE ALREADY IN ARE LEFT OUT (Ryan, 2026-10-09: "hide joined
+ * pools"). They used to come back wearing a "Joined" badge; the web's Discover
+ * search has always dropped them. They live on My Pools.
+ *
+ * ⚠ THE PLAYER COUNT COMES FROM `public_pool_member_counts` (migration 184), NOT
+ * FROM `pool_members`. That table is readable only by a pool's own members, so
+ * counting it here returned 0 for every pool on this list — every pool a member
+ * has not joined. Before 184, nobody outside a public pool ever saw it as
+ * anything but empty.
+ *
+ * ⚠ `enabled` KEEPS IT LAZY. The hook lives on the Pools screen — the filter
+ * sheet and the "Showing X of Y" line need the list as well as the cards — but
+ * most visits to the tab never open Discover. It loads the first time `enabled`
+ * is true and keeps what it has after that.
+ */
 export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {}) {
   const { user } = useAuth();
   const [pools, setPools] = useState<DiscoverPool[]>([]);
@@ -60,10 +118,13 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
           .single();
         if (userErr || !userData) throw userErr ?? new Error('User not found');
 
-        const { data: memberships } = await supabase
+        // ⚠ THE ERROR IS READ. Dropped, a failed read here would be an empty
+        // set — and every pool you are in would reappear on Discover.
+        const { data: memberships, error: memberErr } = await supabase
           .from('pool_members')
           .select('pool_id')
           .eq('user_id', userData.user_id);
+        if (memberErr) throw memberErr;
         const joinedSet = new Set(
           ((memberships ?? []) as Array<{ pool_id: string }>).map((m) => m.pool_id),
         );
@@ -73,9 +134,12 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
           .select(
             `
             pool_id, pool_name, pool_code, description,
-            prediction_mode, league_mode, brand_name, brand_emoji, brand_color,
+            prediction_mode, league_mode, league_depth, league_start_matchweek,
+            league_table_lock_at, league_season_id,
+            brand_name, brand_emoji, brand_color,
             status, prediction_deadline, is_private, created_at,
-            tournaments(external_league_id)
+            tournaments(external_league_id),
+            admin:users!pools_admin_user_id_fkey(username, full_name)
           `,
           )
           .eq('is_private', false)
@@ -91,35 +155,32 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
 
         if (poolErr) throw poolErr;
 
-        const rows = (poolRows ?? []) as Array<{
-          pool_id: string;
-          pool_name: string;
-          pool_code: string;
-          description: string | null;
-          prediction_mode: string | null;
-          league_mode: string | null;
-          brand_name: string | null;
-          brand_emoji: string | null;
-          brand_color: string | null;
-          status: string;
-          prediction_deadline: string | null;
-          created_at: string;
-          // One FK (pools.tournament_id), so PostgREST embeds an OBJECT — but the
-          // typed client infers an array, so both shapes are accepted and read
-          // the same way below.
-          tournaments: TournamentEmbed | TournamentEmbed[] | null;
-        }>;
+        const rows = ((poolRows ?? []) as unknown as PoolRow[]).filter((r) => !joinedSet.has(r.pool_id));
 
-        const counts: Record<string, number> = {};
-        await Promise.all(
-          rows.map(async (row) => {
-            const { count } = await supabase
-              .from('pool_members')
-              .select('*', { count: 'exact', head: true })
-              .eq('pool_id', row.pool_id);
-            counts[row.pool_id] = count ?? 0;
-          }),
+        // One call for every count, and one for every season's matchweeks — not
+        // one query per pool.
+        const seasonIds = [...new Set(rows.map((r) => r.league_season_id).filter((s): s is string => !!s))];
+        const [countsRes, matchweeksRes] = await Promise.all([
+          rows.length
+            ? supabase.rpc('public_pool_member_counts', { p_pool_ids: rows.map((r) => r.pool_id) })
+            : Promise.resolve({ data: [], error: null }),
+          seasonIds.length
+            ? supabase
+                .from('league_matchweeks')
+                .select('season_id, matchweek_number, lock_at')
+                .in('season_id', seasonIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+        if (countsRes.error) throw countsRes.error;
+        if (matchweeksRes.error) throw matchweeksRes.error;
+
+        const counts = new Map(
+          ((countsRes.data ?? []) as Array<{ pool_id: string; member_count: number }>).map((c) => [
+            c.pool_id,
+            c.member_count,
+          ]),
         );
+        const clocks = seasonClocks((matchweeksRes.data ?? []) as MatchweekRow[], new Date());
 
         const mapped: DiscoverPool[] = rows.map((row) => ({
           poolId: row.pool_id,
@@ -128,20 +189,22 @@ export function useDiscoverPools({ enabled = true }: { enabled?: boolean } = {})
           description: row.description,
           predictionMode: row.prediction_mode,
           leagueMode: row.league_mode,
-          externalLeagueId:
-            (Array.isArray(row.tournaments) ? row.tournaments[0] : row.tournaments)
-              ?.external_league_id ?? null,
+          leagueDepth: row.league_depth,
+          leagueStartMatchweek: row.league_start_matchweek,
+          leagueTableLockAt: row.league_table_lock_at,
+          externalLeagueId: one(row.tournaments)?.external_league_id ?? null,
           createdAt: row.created_at,
           brandName: row.brand_name,
           brandEmoji: row.brand_emoji,
           brandColor: row.brand_color,
           status: row.status,
           predictionDeadline: row.prediction_deadline,
-          memberCount: counts[row.pool_id] ?? 0,
-          alreadyJoined: joinedSet.has(row.pool_id),
+          memberCount: counts.get(row.pool_id) ?? 0,
+          adminName: adminNameOf(one(row.admin)),
+          seasonClock: row.league_season_id ? (clocks.get(row.league_season_id) ?? null) : null,
         }));
 
-        // Order is the filter's job now — `applyDiscoverFilters` in
+        // Order is the filter's job — `applyDiscoverFilters` in
         // lib/discoverFilter.ts, where "Popular" is the order this used to be.
         setPools(mapped);
       } catch (err) {

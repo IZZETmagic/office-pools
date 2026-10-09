@@ -1,8 +1,11 @@
-import { Platform, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
+import { BlockShell, Divider } from './PoolListItem';
 import { CompetitionRail } from '@/components/CompetitionRail';
 import { Icon, Text, Pressable } from '@/components/ui';
-import { getModeChip, getModeName, isLeaguePoolMode } from '@/lib/design/poolMode';
+import { discoverCardFacts, formatCountdown, formatSince } from '@/lib/discoverCard';
+import { withLightness } from '@/lib/design/oklch';
+import { getModeChip, getModeName } from '@/lib/design/poolMode';
 import type { DiscoverPool } from '@/lib/useDiscoverPools';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -11,48 +14,67 @@ type DiscoverPoolCardProps = {
   onPress?: () => void;
 };
 
-// ⚠ THIS CARD WAS WORLD-CUP-ONLY UNTIL 2026-10-09 — the same bug the Pools
-// tab card had until 2026-09-05. It held a three-entry MODE_LABEL read with
-// `?? 'Pool'` and a gradient read with `?? full_tournament`, so every league
-// pool wore the word "Pool" on a World Cup blue strip. That was BOTH public
-// pools on Discover that day (Premier League Pick'em). It now names the game
-// and the competition the way PoolListItem does.
+// =============================================================
+// A public pool, as someone deciding whether to join sees it
+// =============================================================
+// Card A (Ryan, 2026-10-09): the My Pools card's family — the competition down
+// the side, the game as a pill, a stats strip, a footer — answering what a
+// joiner needs: how many are in it, where the season is, and how long until
+// picks lock.
+//
+// ⚠ IT WAS WORLD-CUP-ONLY UNTIL 2026-10-09, the bug the My Pools card had until
+// 2026-09-05: a three-entry MODE_LABEL read with `?? 'Pool'`, so both public
+// pools that day (Premier League Pick'em) wore the word "Pool" on a World Cup
+// blue strip, beside a "232d" deadline that was the end of the season.
+//
+// ⚠ AND ITS PLAYER COUNT WAS ALWAYS 0 to anyone outside the pool — see
+// migration 184 and `useDiscoverPools`.
+// =============================================================
 
 function brandHex(hex: string | null): string | null {
   if (!hex) return null;
   return hex.startsWith('#') ? hex : `#${hex}`;
 }
 
-function formatDeadline(iso: string | null): { text: string; urgent: boolean } | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  const ms = date.getTime() - Date.now();
-  if (ms <= 0) return { text: 'Soon', urgent: true };
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  if (days >= 1) return { text: `${days}d`, urgent: days <= 3 };
-  return { text: 'Soon', urgent: true };
+/**
+ * "Pick a winner" or "Predict the score" — only for the two games with weekly
+ * score picks. ⚠ NULL IS "Predict the score": the picker renders score steppers
+ * for anything that is not 'results'.
+ */
+function depthLabel(pool: DiscoverPool): string | null {
+  if (pool.leagueMode !== null && pool.leagueMode !== 'pickem' && pool.leagueMode !== 'showdown') return null;
+  if (pool.predictionMode !== 'league_pickem') return null;
+  return pool.leagueDepth === 'results' ? 'Pick a winner' : 'Predict the score';
 }
 
 export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
   const theme = useTheme();
+  const isDark = theme.mode === 'dark';
   const brandColor = brandHex(pool.brandColor);
   const isBranded = Boolean(pool.brandName && brandColor);
   const modeLabel = getModeName(pool.predictionMode, pool.leagueMode);
-  const modeChip = getModeChip(pool.predictionMode, pool.leagueMode, theme.mode === 'dark');
-  // ⚠ NOT FOR A LEAGUE POOL. Its `prediction_deadline` is the end of the season
-  // (May 2027 on both public pools, 2026-10-09), so the chip read "232d" —
-  // true, and no use to someone deciding whether to join this week.
-  const deadline = isLeaguePoolMode(pool.predictionMode)
-    ? null
-    : formatDeadline(pool.predictionDeadline);
+  const modeChip = getModeChip(pool.predictionMode, pool.leagueMode, isDark);
+  const depth = depthLabel(pool);
+
+  const now = new Date();
+  const facts = discoverCardFacts(pool, pool.seasonClock, now);
+  const countdown = formatCountdown(facts.lockAt, now);
+  // Under a day, the countdown takes the amber the app uses for "picks needed",
+  // lifted or deepened so it reads on the strip in either theme.
+  const soonColor = withLightness(theme.colors.amber, isDark ? 0.82 : 0.52);
+
+  const since = formatSince(pool.createdAt);
+  const footer = pool.adminName ? `Run by ${pool.adminName} · since ${since}` : `Since ${since}`;
 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${pool.poolName}, ${modeLabel}, ${pool.memberCount} ${pool.memberCount === 1 ? 'player' : 'players'}`}
       style={({ pressed }) => ({
-        backgroundColor: theme.colors.surface,
+        backgroundColor: isBranded && brandColor ? withOpacity(brandColor, 0.05) : theme.colors.surface,
         borderRadius: theme.radii.lg,
+        borderCurve: 'continuous',
         overflow: 'hidden',
         flexDirection: 'row',
         opacity: pressed ? 0.85 : 1,
@@ -92,27 +114,20 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
           </View>
         ) : null}
 
-        <View style={{ padding: theme.spacing.md + 2, gap: theme.spacing.sm + 2 }}>
+        <View style={{ padding: theme.spacing.md, gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-            <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 18, lineHeight: 24, color: theme.colors.ink }}
+            >
               {pool.poolName}
             </Text>
-            {pool.alreadyJoined ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="checkmark.circle.fill" color="green" size={16} />
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.semibold,
-                    fontSize: 12,
-                    color: theme.colors.green,
-                  }}
-                >
-                  Joined
-                </RNText>
-              </View>
-            ) : (
-              <Icon name="chevron.right" color="slate" size={14} weight="semibold" />
-            )}
+            <Icon name="chevron.right" color="slate" size={14} weight="semibold" />
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+            <Pill label={modeLabel} background={withOpacity(modeChip.base, modeChip.tint)} color={modeChip.ink} />
+            {depth ? <Pill label={depth} background={theme.colors.mist} color={theme.colors.slate} /> : null}
           </View>
 
           {pool.description ? (
@@ -121,76 +136,61 @@ export function DiscoverPoolCard({ pool, onPress }: DiscoverPoolCardProps) {
             </Text>
           ) : null}
 
+          {/* The same strip, blocks and dividers as the My Pools card. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: theme.spacing.sm,
+              backgroundColor: theme.colors.snow,
+              borderRadius: theme.radii.md,
+              borderCurve: 'continuous',
+              paddingVertical: theme.spacing.md,
+              paddingHorizontal: theme.spacing.sm,
+              gap: theme.spacing.xs,
             }}
           >
-            <ModePill label={modeLabel} chip={modeChip} />
-            <View style={{ flex: 1 }} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Icon name="person.2.fill" color="slate" size={14} />
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 12,
-                  color: theme.colors.slate,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {pool.memberCount}
-              </RNText>
-            </View>
-            {deadline ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="clock" color={deadline.urgent ? 'red' : 'slate'} size={14} />
-                <RNText
-                  style={{
-                    fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: deadline.urgent ? theme.colors.red : theme.colors.slate,
-                  }}
-                >
-                  {deadline.text}
-                </RNText>
-              </View>
+            <BlockShell
+              value={String(pool.memberCount)}
+              valueColor={theme.colors.ink}
+              label={pool.memberCount === 1 ? 'Player' : 'Players'}
+            />
+            {facts.matchweek ? (
+              <>
+                <Divider />
+                {/* A pool that starts later than the open week says so, rather
+                    than implying you would be picking this weekend. */}
+                <BlockShell
+                  value={`${facts.matchweek.startsAt ?? facts.matchweek.current}/${facts.matchweek.total}`}
+                  valueColor={theme.colors.ink}
+                  label={facts.matchweek.startsAt != null ? 'Starts' : 'Matchweek'}
+                />
+              </>
+            ) : null}
+            {countdown ? (
+              <>
+                <Divider />
+                <BlockShell
+                  value={countdown.text}
+                  valueColor={countdown.soon ? soonColor : theme.colors.ink}
+                  label={pool.leagueMode === 'table' ? 'Table locks' : 'Picks lock'}
+                />
+              </>
             ) : null}
           </View>
+
+          <Text variant="caption" color="slate" numberOfLines={1}>
+            {footer}
+          </Text>
         </View>
       </View>
     </Pressable>
   );
 }
 
-/** The game, in its identity colour — the same pill as the My Pools card. */
-function ModePill({
-  label,
-  chip,
-}: {
-  label: string;
-  chip: { base: string; ink: string; tint: number };
-}) {
+function Pill({ label, background, color }: { label: string; background: string; color: string }) {
   return (
-    <View
-      style={{
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 999,
-        backgroundColor: withOpacity(chip.base, chip.tint),
-      }}
-    >
-      <RNText
-        style={{
-          fontFamily: fontFamilies.semibold,
-          fontSize: 11,
-          color: chip.ink,
-        }}
-      >
-        {label}
-      </RNText>
+    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: background }}>
+      <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 11, color }}>{label}</RNText>
     </View>
   );
 }

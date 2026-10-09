@@ -5,9 +5,10 @@
 // rules are the same as My Pools' and come from lib/poolsFilter.ts; what
 // differs is what is left out and how it sorts.
 //
-// ⚠ NO STATUS AND NO PICKS. Discover only lists open pools you have not
-// committed to (useDiscoverPools asks for `status = 'open'`), so both would
-// read the same for every row — a control that cannot change anything.
+// ⚠ NO STATUS AND NO PICKS. Discover only lists open pools you are not in —
+// useDiscoverPools asks for `status = 'open'` and, since 2026-10-09, drops the
+// pools you have joined — so both would read the same for every row, a control
+// that cannot change anything.
 //
 // ⚠ NO "CLOSING SOON". A league pool's `prediction_deadline` is the end of its
 // season (May 2027 on both public pools on 2026-10-09), so sorting by it would

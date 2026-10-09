@@ -408,8 +408,13 @@ function Block({
   );
 }
 
-/** The two stacked lines every non-graphical block is. */
-function BlockShell({
+/**
+ * The two stacked lines every non-graphical block is.
+ *
+ * Exported for the Discover card, so a public pool's stats strip and your own
+ * pool's strip are the same strip.
+ */
+export function BlockShell({
   value,
   valueColor,
   label,
@@ -439,7 +444,7 @@ function BlockShell({
   );
 }
 
-function Divider() {
+export function Divider() {
   const theme = useTheme();
   return (
     <View

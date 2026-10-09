@@ -154,10 +154,20 @@ export default function PoolPreviewSheet() {
           return;
         }
 
-        const { count: memberCount } = await supabase
-          .from('pool_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('pool_id', id);
+        // ⚠ A NON-MEMBER CANNOT COUNT `pool_members` — the table is readable
+        // only by a pool's own members, so this preview told everyone deciding
+        // whether to join that the pool was empty. Migration 184's
+        // `public_pool_member_counts` returns the number (and only the number)
+        // for a public pool; a private pool you are in still counts the old way.
+        const [{ data: publicCounts }, { count: memberRowCount }] = await Promise.all([
+          supabase.rpc('public_pool_member_counts', { p_pool_ids: [id] }),
+          supabase
+            .from('pool_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('pool_id', id),
+        ]);
+        const publicCount = (publicCounts as Array<{ member_count: number }> | null)?.[0]?.member_count;
+        const memberCount = publicCount ?? memberRowCount;
 
         let alreadyJoined = false;
         if (userData) {

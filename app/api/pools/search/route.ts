@@ -48,17 +48,21 @@ async function handleGET(request: NextRequest) {
     return NextResponse.json({ pools: [] })
   }
 
-  // Fetch member counts in a single query instead of N+1
+  // ⚠ NOT FROM `pool_members`. That table is readable only by a pool's own
+  // members, and every pool here is one the caller is NOT in — so counting it
+  // returned 0 for every result. Migration 184's function returns the number,
+  // and only the number, for public pools.
   const poolIds = availablePools.map((p: any) => p.pool_id)
-  const { data: memberCounts } = await supabase
-    .from('pool_members')
-    .select('pool_id')
-    .in('pool_id', poolIds)
+  const { data: memberCounts, error: countError } = await supabase.rpc('public_pool_member_counts', {
+    p_pool_ids: poolIds,
+  })
+  if (countError) {
+    return NextResponse.json({ error: countError.message }, { status: 500 })
+  }
 
-  // Build a count map
   const countMap = new Map<string, number>()
-  for (const row of memberCounts ?? []) {
-    countMap.set(row.pool_id, (countMap.get(row.pool_id) ?? 0) + 1)
+  for (const row of (memberCounts ?? []) as Array<{ pool_id: string; member_count: number }>) {
+    countMap.set(row.pool_id, row.member_count)
   }
 
   const poolsWithCounts = availablePools.map((pool: any) => ({
