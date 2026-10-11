@@ -3,10 +3,11 @@
 **Status:** BUILT and APPLIED to production 2026-10-11 01:28 UTC as
 `lib/migrations/187_a_called_off_match_gives_its_points_back.sql`. The backfill self-check passed
 (both fixtures cleared, 0 left, no member's points moved). The trigger change needs no deploy.
-⬜ `scripts/verify-abandoned-fixture-retraction.ts` is written and type-checks, but has **not been run**:
-it writes a scratch season to the production database, so it waits for Ryan's go-ahead.
-⬜ Live `prosrc` hashes (`league_score_fixture` 1b880834… / 16694; trigger 8cc3e4a9… / 1507) are
-still to be compared against the file.
+✅ `scripts/verify-abandoned-fixture-retraction.ts` **ALL CHECKS PASSED** 2026-10-11, run with Ryan's
+go-ahead, scratch fully torn down, nothing queued to `notification_outbox`.
+✅ Live `prosrc` matches the file: `league_score_fixture` 1b880834… / 16694, trigger 8cc3e4a9… / 1507.
+⬜ `verify-postponed-fixtures.ts` and `verify-league-leaderboard.ts` were NOT re-run. The first creates
+UNARCHIVED scratch pools whose snapshot can queue a real "results are in" (separate task).
 **Found:** 2026-10-10, Rayo Vallecano v Athletic Club (La Liga MW8, api-football 1570410),
 abandoned at 0–0 around the half-hour mark after objects were thrown onto the pitch.
 **Migration:** 187 (185 and 186 are untracked files from other sessions; re-check the number at build time).

@@ -65,6 +65,7 @@ const FX_A = `${S}${hex(201)}`   // the match that gets called off
 const FX_B = `${S}${hex(202)}`   // the match that is played
 const FX_C = `${S}${hex(211)}`   // next week, never touched
 const E = (n: number) => `${S}${hex(300 + n)}`
+const TOURNAMENT = `${S}${hex(9)}`
 
 let failures = 0
 const ok = (m: string, x = '') => console.log(`    ✓ ${m}${x ? `  — ${x}` : ''}`)
@@ -120,8 +121,19 @@ async function setup() {
 
   const users = await must('u', admin.from('users').select('user_id').eq('username', 'IZZETmagic').limit(1))
   const adminUser = ((users ?? [])[0] as { user_id: string }).user_id
-  const tp = await must('t', admin.from('pools').select('tournament_id').not('league_season_id', 'is', null).limit(1))
-  const tournamentId = ((tp ?? [])[0] as { tournament_id: string }).tournament_id
+  // Matches the scratch season's triple exactly, and format='league' — both
+  // halves of migration 111's rule. Borrowing a real tournament raises, and
+  // giving the scratch season a REAL triple would be worse: loadSyncTargets
+  // treats two seasons on one triple as a conflict and stops syncing both.
+  await must('scratch tournament', admin.from('tournaments').insert({
+    tournament_id: TOURNAMENT, name: '__scratch 187 (auto-deleted)',
+    tournament_type: 'league', year: 2026, num_teams: 4, num_groups: 1,
+    teams_per_group: 4, start_date: '2026-08-01', end_date: '2027-05-30',
+    prediction_deadline: hours(24), status: 'upcoming',
+    external_provider: 'scratch', external_league_id: -187, external_season: -2026,
+    format: 'league',
+  }).select('tournament_id'))
+  const tournamentId = TOURNAMENT
 
   await must('season', admin.from('league_seasons').insert({
     season_id: SEASON, competition_slug: 'scratch-187', competition_name: 'Scratch Abandoned',
@@ -134,7 +146,11 @@ async function setup() {
     abbreviation: `C${n}`, external_club_id: -(1870 + n),
   }))).select('club_id'))
 
-  // MW1 locks in an hour, MW2 in a week, so MW1 is the open matchweek and takes
+  // ⚠ Kickoff THREE hours out, not one: refresh_league_matchweek_window derives
+  // lock_at as an hour before the first kickoff, so a kickoff an hour away
+  // locks the week the moment its fixtures are inserted.
+  //
+  // MW1 locks in two hours, MW2 in a week, so MW1 is the open matchweek and takes
   // picks (enforce_league_prediction_before_lock DROPS a pick on any other week,
   // silently). MW2 never locks during the run, so MW1 can never settle and no
   // snapshot can fire.
@@ -142,7 +158,7 @@ async function setup() {
     await must(`mw${n}`, admin.from('league_matchweeks').insert({
       matchweek_id: MW(n), season_id: SEASON, matchweek_number: n, label: `MW${n}`,
       provider_round: `r${n}`, fixture_count: n === 1 ? 2 : 1, completed_fixture_count: 0,
-      first_kickoff_at: hours(n === 1 ? 1 : 168), lock_at: hours(n === 1 ? 1 : 168),
+      first_kickoff_at: hours(n === 1 ? 3 : 168), lock_at: hours(n === 1 ? 3 : 168),
     }).select('matchweek_id'))
   }
   for (const [fx, mw, num, home, away] of [
@@ -151,13 +167,13 @@ async function setup() {
     await must(`fx${num}`, admin.from('league_fixtures').insert({
       fixture_id: fx, season_id: SEASON, matchweek_id: MW(mw), fixture_number: num,
       home_club_id: CLUB(home), away_club_id: CLUB(away),
-      kickoff_at: hours(mw === 1 ? 1 : 168), status: 'scheduled', is_completed: false,
+      kickoff_at: hours(mw === 1 ? 3 : 168), status: 'scheduled', is_completed: false,
       external_fixture_id: `scratch-187-${num}`,
     }).select('fixture_id'))
   }
 
   for (const [pid, mode, depth, memN, entries] of [
-    [POOL_P, 'pickem', null, 1, [1, 2]],
+    [POOL_P, 'pickem', 'scores', 1, [1, 2]],
     [POOL_D, 'showdown', 'results', 2, [3, 4]],
   ] as Array<[string, string, string | null, number, number[]]>) {
     await must(`pool ${mode}`, admin.from('pools').insert({
@@ -166,6 +182,10 @@ async function setup() {
       status: 'open', prediction_mode: 'league_pickem', league_season_id: SEASON,
       league_mode: mode, league_depth: depth, max_entries_per_user: 10,
       archived_at: new Date().toISOString(),
+      // Two entries for one member. The free tier caps that at one from the
+      // day `tier_enforced_from` is set (it defaults to now()); NULL is how a
+      // grandfathered pool reads, and the engine under test never looks at it.
+      tier_enforced_from: null,
     }).select('pool_id'))
     await must('mem', admin.from('pool_members').insert({
       member_id: MEM(memN), pool_id: pid, user_id: adminUser, role: 'admin',
@@ -176,7 +196,14 @@ async function setup() {
       }).select('entry_id'))
     }
   }
-  await must('sched', admin.rpc('league_generate_duel_schedule', { p_pool_id: POOL_D }))
+  // The matchweek-1 duel, written directly. league_generate_duel_schedule would
+  // start this pool at MATCHWEEK 2 — a Showdown pool created this close to its
+  // first kickoff misses that week's draw by design — and what is under test
+  // here is what a retraction does to a SETTLED duel, not how duels are drawn.
+  await must('duel', admin.from('league_duels').insert({
+    pool_id: POOL_D, matchweek_number: 1, entry_a: E(3), entry_b: E(4),
+    drawn_at: new Date().toISOString(),
+  }).select('duel_id'))
 
   // E1 picks 0–0 on the match that gets called off; E2 picks the other one
   // exactly. Before the call-off E1 leads; after it, E2 must.
@@ -221,7 +248,7 @@ async function checks() {
   const d1 = await must('d', admin.from('league_duels')
     .select('duel_id, points_a, points_b, settled_at').eq('pool_id', POOL_D).eq('matchweek_number', 1))
   const duel = (d1 as Array<{ duel_id: string; points_a: number; points_b: number | null; settled_at: string | null }>)[0]
-  if (!duel) bad('a matchweek-1 duel exists', 'league_generate_duel_schedule made none')
+  if (!duel) throw new Error('the matchweek-1 duel is missing')
   else eq('the duel is settled', duel.settled_at !== null, true)
   const e3duel = (await totals(3)).duel_points
   eq('E3 won it', e3duel, 500)
@@ -317,11 +344,20 @@ async function teardown() {
     await admin.from('pools').delete().eq('pool_id', pid)
   }
   await admin.from('league_seasons').delete().eq('season_id', SEASON)
-  const { count } = await admin.from('league_seasons')
-    .select('*', { count: 'exact', head: true }).eq('season_id', SEASON)
-  const { count: pools } = await admin.from('pools')
-    .select('*', { count: 'exact', head: true }).in('pool_id', [POOL_P, POOL_D])
-  if ((count ?? 0) + (pools ?? 0) > 0) bad('scratch removed', `${count} season, ${pools} pools left`)
+  await admin.from('tournaments').delete().eq('tournament_id', TOURNAMENT)
+
+  const left: string[] = []
+  for (const [t, col, vals] of [
+    ['pools', 'pool_id', [POOL_P, POOL_D]],
+    ['league_seasons', 'season_id', [SEASON]],
+    ['league_fixtures', 'season_id', [SEASON]],
+    ['league_score_events', 'pool_id', [POOL_P, POOL_D]],
+    ['tournaments', 'tournament_id', [TOURNAMENT]],
+  ] as const) {
+    const { count } = await admin.from(t).select('*', { count: 'exact', head: true }).in(col, [...vals])
+    if ((count ?? 0) > 0) left.push(`${t}=${count}`)
+  }
+  if (left.length) bad('scratch data fully removed', left.join(', '))
   else ok('scratch data fully removed', 'production is exactly as it was found')
 }
 
