@@ -893,8 +893,14 @@ export async function syncLeagueFixtures(
     if (!sr?.ok) {
       // Not an error. Two ordinary cases reach here: a fixture reported
       // completed a tick before its goals land, and a postponed or cancelled
-      // fixture that still carries a score — the engine refuses both and names
-      // which in `reason`. The next tick picks up anything real.
+      // fixture that still carries a score. Since migration 187 the engine
+      // does more than refuse the second: it RETRACTS whatever the fixture
+      // scored while it was live, and says how many rows in `retracted`.
+      //
+      // This loop's goals filter means a fixture called off with its goals
+      // blanked never reaches this line. It does not need to: the
+      // score_league_fixture_on_change trigger (126, unfiltered since 187)
+      // already asked the engine when the row was written.
       continue
     }
     result.scored++
