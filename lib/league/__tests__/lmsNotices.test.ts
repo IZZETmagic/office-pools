@@ -26,8 +26,8 @@ const HOUR = 3_600_000
 const queued = vi.mocked(enqueue)
 const lockPlan = vi.mocked(planLockReminder)
 
-/** A world whose open matchweek locks `hoursToLock` from NOW. */
-function world(hoursToLock: number) {
+/** A world whose open matchweek locks `hoursToLock` from NOW — by default, with last week's games over. */
+function world(hoursToLock: number, { inPlayOver = true }: { inPlayOver?: boolean } = {}) {
   const lockAt = new Date(NOW + hoursToLock * HOUR).toISOString()
   return {
     lockAt,
@@ -66,7 +66,7 @@ function world(hoursToLock: number) {
         ],
         users: [{ user_id: 'u1', full_name: 'Mia Lowe', username: 'mia' }],
       },
-      { league_open_matchweek: 'mw6' },
+      { league_open_matchweek: 'mw6', league_in_play_is_over: inPlayOver },
     ),
   }
 }
@@ -107,6 +107,33 @@ describe('who a Last Man Standing notice goes to', () => {
     const { db } = world(1.5)
     await queueLeagueReminders(db.client, NOW)
     expect(lmsNotices()).toMatchObject([{ type: 'lms_pick_reminder', dedupKey: 'lms_pick_reminder:mw6:lms1:u1:last', payload: { window: 'last' } }])
+  })
+
+  it('while last week\'s games are still being played: nothing yet — the open notice waits for the final whistle', async () => {
+    const { db } = world(96, { inPlayOver: false })
+    await queueLeagueReminders(db.client, NOW)
+    expect(lmsNotices()).toEqual([])
+    expect(db.rpcCalls).toContainEqual({ fn: 'league_in_play_is_over', args: { p_season_id: 's1' } })
+  })
+
+  it('a failed read of "is it over" holds the open notice — never sends it early, never throws', async () => {
+    const { db } = world(96)
+    const rpc = db.client as unknown as { rpc: (fn: string, args: unknown) => Promise<unknown> }
+    const real = rpc.rpc.bind(rpc)
+    rpc.rpc = (fn, args) => fn === 'league_in_play_is_over'
+      ? Promise.resolve({ data: null, error: { message: 'boom' } })
+      : real(fn, args)
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(queueLeagueReminders(db.client, NOW)).resolves.toBeDefined()
+    expect(lmsNotices()).toEqual([])
+    err.mockRestore()
+  })
+
+  it('the reminders keep their clock while games are still being played — they are about the deadline', async () => {
+    const { db } = world(20, { inPlayOver: false })
+    await queueLeagueReminders(db.client, NOW)
+    expect(lmsNotices()).toMatchObject([{ type: 'lms_pick_reminder', dedupKey: 'lms_pick_reminder:mw6:lms1:u1:day' }])
+    expect(db.rpcCalls.map((c) => c.fn)).not.toContain('league_in_play_is_over')
   })
 
   it('after the lock: nothing', async () => {

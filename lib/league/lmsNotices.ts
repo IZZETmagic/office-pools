@@ -16,8 +16,12 @@
 // urgent that applies — so a player first seen inside the last two hours gets the last call alone,
 // not three messages at once.
 //
-//   lms_pick_open      the matchweek is open and more than a day from locking
-//   lms_pick_reminder  a day before the lock ('day'), and in its last two hours ('last')
+//   lms_pick_open      the matchweek is open, more than a day from locking, AND the matchweek being
+//                      played is over (Ryan, 2026-10-10: "shouldn't be sent until the current match
+//                      week ends"; migration 185). Held until then; inside a day the reminder
+//                      replaces it.
+//   lms_pick_reminder  a day before the lock ('day'), and in its last two hours ('last'). NOT held:
+//                      it is about the deadline, and a missed pick knocks you out.
 //   lock_reminder      pick'em and Showdown: the LAST CALL, in the last two hours. Its day-before
 //                      reminder is still the league outbox's (lib/league/notify.ts) until N3's
 //                      cut-over, so between them a member hears at most twice.
@@ -65,6 +69,21 @@ async function openMatchweeks(admin: SupabaseClient, seasonIds: string[]): Promi
   return out
 }
 
+/**
+ * The seasons whose matchweek being played is over (league_in_play_is_over, migration 185) — the
+ * open notice waits for it. A failed read HOLDS the notice rather than sending it early, and is not
+ * thrown: the reminders queued beside it are about the deadline and must not fail with it.
+ */
+async function inPlayOver(admin: SupabaseClient, seasonIds: string[]): Promise<Set<string>> {
+  const over = new Set<string>()
+  for (const seasonId of seasonIds) {
+    const { data, error } = await admin.rpc('league_in_play_is_over', { p_season_id: seasonId })
+    if (error) console.error(`[league-notices] league_in_play_is_over failed, open notice held: ${error.message}`)
+    else if (data === true) over.add(seasonId)
+  }
+  return over
+}
+
 const matchweekName = (mw: OpenMatchweek) => mw.label || `Matchweek ${mw.matchweek_number}`
 
 // =============================================================
@@ -74,6 +93,7 @@ const matchweekName = (mw: OpenMatchweek) => mw.label || `Matchweek ${mw.matchwe
 export type LmsPoolPlan = {
   poolId: string
   poolName: string
+  seasonId: string
   matchweek: OpenMatchweek
   roundId: string
   /** Per member: their entries still in the round with no pick for the open matchweek. */
@@ -162,7 +182,7 @@ export async function planLms(admin: SupabaseClient, poolIds?: string[]): Promis
       usedClubs.set(k.entry_id, [...(usedClubs.get(k.entry_id) ?? []), clubName.get(k.club_id) ?? 'a club'])
     }
 
-    out.set(pool.pool_id, { poolId: pool.pool_id, poolName: pool.pool_name, matchweek: mw, roundId: round.round_id, unpicked, usedClubs })
+    out.set(pool.pool_id, { poolId: pool.pool_id, poolName: pool.pool_name, seasonId: pool.league_season_id, matchweek: mw, roundId: round.round_id, unpicked, usedClubs })
   }
   return out
 }
@@ -178,10 +198,13 @@ export async function queueLeagueReminders(
   const notices: NoticeInsert[] = []
 
   // Last Man Standing: open, a day before, the last call.
-  for (const plan of (await planLms(admin)).values()) {
-    if (!plan.matchweek.lock_at) continue
-    const window = windowFor(Date.parse(plan.matchweek.lock_at) - now)
-    if (!window) continue
+  const due = [...(await planLms(admin)).values()]
+    .map((plan) => ({ plan, window: plan.matchweek.lock_at ? windowFor(Date.parse(plan.matchweek.lock_at) - now) : null }))
+  // The open notice waits until the matchweek being played is over; the reminders keep their clock.
+  const over = await inPlayOver(admin, [...new Set(due.filter((d) => d.window === 'open').map((d) => d.plan.seasonId))])
+  for (const { plan, window } of due) {
+    if (!window || !plan.matchweek.lock_at) continue
+    if (window === 'open' && !over.has(plan.seasonId)) continue
     for (const userId of plan.unpicked.keys()) {
       notices.push({
         type: window === 'open' ? 'lms_pick_open' : 'lms_pick_reminder',
