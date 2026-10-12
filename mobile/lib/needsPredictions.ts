@@ -66,6 +66,51 @@ export function poolNeedsPredictions(p: NeedsPredictionsInput): boolean {
 }
 
 // -------------------------------------------------------------------------
+// OWING A PICK IS NOT THE SAME AS BEING ASKED FOR ONE
+// -------------------------------------------------------------------------
+// Ryan, 2026-10-12, on a Monday-lunchtime Home banner reading "5 pools need
+// predictions" while the Premier League's last game of matchweek 6 was still to
+// kick off that night: "This should not appear until the matchweek for the pool
+// has completed."
+//
+// Every one of those pools DID owe picks. Matchweek 7 opened the moment 6
+// locked, on Saturday morning, and picking early is allowed. What was wrong was
+// being nagged about next week while this week was being played — the same
+// thing migration 185 stopped the push from doing.
+//
+// So there are two answers, not one, and folding the second into
+// `poolNeedsPredictions` would have been a lie: the card's footer and the
+// Submitted filter read "doesn't need predictions" as DONE, so the card would
+// have said "Submitted" over picks nobody had made.
+//
+//   owes a pick                    -> poolNeedsPredictions
+//   ...and it is time to say so    -> isAskingForPicks
+//
+// `picksDue` is the server's (lib/league/poolCards.ts) and true for anything
+// that is not a league pool, or when the API is older than the field.
+//
+// ⚠ ONLY AN EXPLICIT `false` WAITS. A summary restored from the persistent
+// cache before this field existed has no `picksDue` at all, and that must ask
+// rather than quietly hide a deadline until the next fetch.
+// -------------------------------------------------------------------------
+
+export type PicksAsked = { needsPredictions: boolean; picksDue: boolean };
+
+/**
+ * The Home banner's count, the Pending filter and the smart sort — the things
+ * that call a pool to your attention. The banner opens Pending, so the two must
+ * agree or "2 pools need predictions" lands on a list of five.
+ */
+export function isAskingForPicks(p: PicksAsked): boolean {
+  return p.needsPredictions && p.picksDue !== false;
+}
+
+/** Owed, but the matchweek before it is still being played. Pickable; not chased. */
+export function isWaitingForPicks(p: PicksAsked): boolean {
+  return p.needsPredictions && p.picksDue === false;
+}
+
+// -------------------------------------------------------------------------
 // THE PROGRESSIVE BRANCH'S INPUT
 // -------------------------------------------------------------------------
 // `poolNeedsPredictions` above takes `progressiveUnsubmitted` as a given. This

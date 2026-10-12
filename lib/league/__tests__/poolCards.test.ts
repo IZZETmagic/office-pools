@@ -10,6 +10,7 @@
 //   2. except in Table mode, where it is the table lock
 //   3. Table and Last Man Standing are ONE decision, not N
 //   4. the matchweek count comes from the season, not from 38
+//   5. the ask waits for the matchweek being played (185), the deadline does not
 //
 // =============================================================
 
@@ -41,7 +42,13 @@ function matchweeks(count = 38) {
  * code asks for that is not listed returns empty, which is what production
  * would do too — the point of the module is that empty must not be silent.
  */
-function stub(tables: Record<string, unknown[]>) {
+function stub(
+  tables: Record<string, unknown[]>,
+  /** Per-RPC answers, for the tests that need one other than the defaults below. */
+  rpcs: Record<string, { data: unknown; error: { message: string } | null }> = {},
+  /** Every RPC the code asked, in order. */
+  calls: string[] = [],
+) {
   const q = (rows: unknown[]) => {
     const chain = {
       select: () => chain,
@@ -64,12 +71,15 @@ function stub(tables: Record<string, unknown[]>) {
      * would silently empty `opponentName` and the mode/decision assertions
      * below would still pass, which is the wrong kind of green.
      */
-    rpc: (fn: string) =>
-      Promise.resolve(
-        fn === 'league_duel_is_revealed'
-          ? { data: true, error: null }
-          : { data: null, error: null },
-      ),
+    rpc: (fn: string) => {
+      calls.push(fn)
+      return Promise.resolve(
+        rpcs[fn] ??
+          (fn === 'league_duel_is_revealed'
+            ? { data: true, error: null }
+            : { data: null, error: null }),
+      )
+    },
   } as never
 }
 
@@ -189,5 +199,86 @@ describe('degrading rather than throwing', () => {
     // would tell a member they had picked when they had not.
     const facts = await readLeagueCardFacts(stub({}), [{ ...pickemPool, seasonId: null }])
     expect(facts.get('p1')!.hasSubmitted).toBe(false)
+  })
+})
+
+describe('when the open matchweek is ASKED for (185)', () => {
+  // Ryan, 2026-10-12: "This should not appear until the matchweek for the pool
+  // has completed." The open matchweek opens at the previous one's lock, so a
+  // Saturday-to-Monday Home banner was about next week.
+  //
+  // MW2 is being played (locked, unfinished); MW3 is open and locks in three
+  // days — outside the 24-hour window, so the answer is the database's.
+  const weekend = () =>
+    matchweeks().map((m) => ({
+      ...m,
+      completed_fixture_count: m.matchweek_number === 1 ? 10 : 0,
+      lock_at: new Date(NOW + (m.matchweek_number - 2) * 3 * 24 * HOUR - HOUR).toISOString(),
+    }))
+  const beingPlayed = { league_in_play_is_over: { data: false, error: null } }
+
+  it('waits while the matchweek before is still being played', async () => {
+    const facts = await readLeagueCardFacts(stub({ league_matchweeks: weekend() }, beingPlayed), [pickemPool])
+    const f = facts.get('p1')!
+    expect(f.openMatchweekNumber).toBe(3)
+    expect(f.picksDue).toBe(false)
+    // ⚠ The FACT is untouched. Nothing was picked, and nothing may say it was —
+    // that is what keeps the card off "Submitted".
+    expect(f.hasSubmitted).toBe(false)
+  })
+
+  it('asks once it is over', async () => {
+    const over = { league_in_play_is_over: { data: true, error: null } }
+    const facts = await readLeagueCardFacts(stub({ league_matchweeks: weekend() }, over), [pickemPool])
+    expect(facts.get('p1')!.picksDue).toBe(true)
+  })
+
+  it('waits in every weekly mode, not just Pick’em', async () => {
+    for (const leagueMode of ['showdown', 'last_man_standing']) {
+      const facts = await readLeagueCardFacts(
+        stub({ league_matchweeks: weekend() }, beingPlayed),
+        [{ ...pickemPool, leagueMode }],
+      )
+      expect(facts.get('p1')!.picksDue, leagueMode).toBe(false)
+    }
+  })
+
+  it('⚠ never holds the last 24 hours — the deadline is not the announcement', async () => {
+    // Being played right up to the lock is Christmas-shaped, and in Last Man
+    // Standing a missed pick knocks you out. Not even asked: nothing it could
+    // say would change the answer.
+    const close = weekend().map((m) =>
+      m.matchweek_number === 3 ? { ...m, lock_at: new Date(NOW + 20 * HOUR).toISOString() } : m,
+    )
+    const calls: string[] = []
+    const facts = await readLeagueCardFacts(stub({ league_matchweeks: close }, beingPlayed, calls), [pickemPool])
+    expect(facts.get('p1')!.picksDue).toBe(true)
+    expect(calls).not.toContain('league_in_play_is_over')
+  })
+
+  it('never holds Table mode, which is one decision against its own lock', async () => {
+    const calls: string[] = []
+    const facts = await readLeagueCardFacts(
+      stub({ league_matchweeks: weekend(), league_table_predictions: [] }, beingPlayed, calls),
+      [{ ...pickemPool, leagueMode: 'table', tableLockAt: new Date(NOW + 5 * 24 * HOUR).toISOString() }],
+    )
+    expect(facts.get('p1')!.picksDue).toBe(true)
+    expect(calls).not.toContain('league_in_play_is_over')
+  })
+
+  it('⚠ asks when the database cannot answer', async () => {
+    // A banner shown early costs nothing; a deadline hidden costs points.
+    const broken = { league_in_play_is_over: { data: null, error: { message: 'function does not exist' } } }
+    const facts = await readLeagueCardFacts(stub({ league_matchweeks: weekend() }, broken), [pickemPool])
+    expect(facts.get('p1')!.picksDue).toBe(true)
+  })
+
+  it('asks the database once per season, not once per pool', async () => {
+    const calls: string[] = []
+    await readLeagueCardFacts(stub({ league_matchweeks: weekend() }, beingPlayed, calls), [
+      pickemPool,
+      { ...pickemPool, poolId: 'p2', entryId: 'e2' },
+    ])
+    expect(calls.filter((c) => c === 'league_in_play_is_over')).toHaveLength(1)
   })
 })

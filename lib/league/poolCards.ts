@@ -104,6 +104,30 @@ export type LeagueCardFacts = {
   /** True when nothing is left to decide for the current matchweek. */
   hasSubmitted: boolean
   /**
+   * Whether it is time to ASK for the open matchweek's picks — the Home banner,
+   * the Pending filter and the amber "Predictions needed" read it beside
+   * `hasSubmitted`, which stays the plain fact.
+   *
+   * Ryan, 2026-10-12, on a Monday-lunchtime "5 pools need predictions" with the
+   * Premier League's last game of matchweek 6 still to kick off that night:
+   * "This should not appear until the matchweek for the pool has completed."
+   * The open matchweek opens at the previous one's LOCK, so all weekend the
+   * banner was about next week while this week was being played — the in-app
+   * twin of the push 185 already holds.
+   *
+   * So this is 185's rule, not a second one: true once the matchweek being
+   * played is over (`league_in_play_is_over`), OR once the open matchweek is
+   * inside its last 24 hours, because the deadline is never held — in Last Man
+   * Standing a missed pick knocks you out. Picking early is untouched; only the
+   * asking waits.
+   *
+   * ⚠ TRUE WHEN IN DOUBT. A failed read, no open matchweek, Table mode (one
+   * decision against its own lock) — all ask. The notice fails the other way,
+   * because a sent push cannot be unsent; a banner shown too early costs
+   * nothing, a deadline hidden costs points.
+   */
+  picksDue: boolean
+  /**
    * Showdown's KPI strip. NULL for every other mode.
    *
    * Showdown is a LAYER over the weekly accuracy number (migration 084), so its
@@ -310,10 +334,14 @@ const EMPTY: LeagueCardFacts = {
   completedPicks: 0,
   madePicks: 0,
   hasSubmitted: false,
+  picksDue: true,
   showdown: null,
   lms: null,
   table: null,
 }
+
+/** 185's `p_reminder_window`: inside it, the deadline speaks whatever is being played. */
+const PICKS_DUE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 /**
  * Table mode and Last Man Standing are ONE decision, not N.
@@ -377,6 +405,32 @@ export async function readLeagueCardFacts(
     if (!open) continue
     openByPool.set(p.poolId, open)
   }
+
+  // ---- 1b. is the matchweek being played over? (185) ------------------------
+  // ⚠ ASKED OF THE DATABASE, never re-derived here. "Over" is per fixture —
+  // finished, postponed, cancelled, or three hours past a kickoff the feed never
+  // closed — and `league_in_play_is_over` is the one definition the push
+  // already waits on. A second copy over `completed_fixture_count` would hold
+  // the banner all week behind a single called-off game.
+  //
+  // Only the pools where the answer can change anything: Table mode is one
+  // decision against its own lock, and a pool already inside its last 24 hours
+  // is due whatever is being played.
+  const canWait = (p: LeagueCardPool): p is LeagueCardPool & { seasonId: string } => {
+    const open = openByPool.get(p.poolId)
+    if (!open || !p.seasonId || p.leagueMode === 'table') return false
+    return open.lock_at === null || Date.parse(open.lock_at) - now > PICKS_DUE_WINDOW_MS
+  }
+  const seasonsToAsk = new Set(pools.filter(canWait).map((p) => p.seasonId))
+  const stillBeingPlayed = new Set<string>()
+  await Promise.all(
+    Array.from(seasonsToAsk).map(async (seasonId) => {
+      const { data, error } = await admin.rpc('league_in_play_is_over', { p_season_id: seasonId })
+      // ⚠ THE ERROR IS READ, and it ASKS. See `picksDue`.
+      if (error) console.error('[league] league_in_play_is_over failed, picks treated as due:', error.message)
+      else if (data === false) stillBeingPlayed.add(seasonId)
+    }),
+  )
 
   // ---- 2. what each pool's member still has to decide -----------------------
   const single = pools.filter((p) => SINGLE_DECISION_MODES.has(p.leagueMode ?? ''))
@@ -957,6 +1011,7 @@ export async function readLeagueCardFacts(
       completedPicks: isSingle ? 0 : (open?.completed_fixture_count ?? 0),
       madePicks: made,
       hasSubmitted: total > 0 && made >= total,
+      picksDue: !(canWait(p) && stillBeingPlayed.has(p.seasonId)),
       showdown,
       lms,
       table,

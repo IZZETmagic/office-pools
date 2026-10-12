@@ -103,6 +103,12 @@ export type PoolSummary = {
   // See the note at the assignment: nothing writes
   // `pool_entries.has_submitted_predictions` for a league.
   needsPredictions: boolean;
+  /**
+   * Whether it is time to ASK for what `needsPredictions` says is owed — false
+   * while the matchweek before a league pool's open one is still being played.
+   * Read through `isAskingForPicks` / `isWaitingForPicks` in lib/needsPredictions.
+   */
+  picksDue: boolean;
   predictionsCompleted: number;
   predictionsTotal: number;
   /**
@@ -813,6 +819,9 @@ export function useHomeDataInternal() {
               progressiveUnsubmitted: progressiveNeedsPredictions[pool.pool_id] ?? false,
               entryHasSubmitted: best?.has_submitted_predictions ?? false,
             }),
+            // The server's, for a league pool (migration 185's rule). Anything
+            // else — a World Cup pool, an older API — asks, as it always has.
+            picksDue: poolFacts?.[pool.pool_id]?.picksDue ?? true,
             // ⚠ THE UNIT DIFFERS BY COMPETITION, and the server decides it for
             // a league. A World Cup ring counts the whole tournament; a league
             // ring counts the OPEN MATCHWEEK, because "12 of 380" is true and

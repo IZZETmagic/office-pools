@@ -13,6 +13,7 @@
 
 import { getCompetitionMonogram, getCompetitionName } from './design/competition';
 import { isLeaguePoolMode, LEAGUE_MODES, type LeagueMode } from './design/poolMode';
+import { isAskingForPicks } from './needsPredictions';
 import type { PoolSummary } from './useHomeData';
 
 // Mirrors the values pools.status can actually hold. Migration 025b constrains
@@ -60,6 +61,7 @@ export type FilterablePool = Pick<
   | 'predictionMode'
   | 'leagueMode'
   | 'needsPredictions'
+  | 'picksDue'
   | 'externalLeagueId'
   | 'brandName'
   | 'joinedAt'
@@ -115,7 +117,12 @@ function matches(pool: FilterablePool, filters: PoolsFilters): boolean {
   // `needsPredictions` is the canonical "does the user still have to predict
   // something?" check — see lib/needsPredictions.ts. Filtering on it keeps the
   // Picks control in step with the card's own pill and the Home tab's count.
-  if (filters.predictions === 'pending' && !pool.needsPredictions) return false;
+  //
+  // ⚠ PENDING IS WHAT WE ARE ASKING FOR, SUBMITTED IS WHAT IS DONE, and a
+  // league pool whose matchweek before is still being played is neither. Home's
+  // banner opens Pending, so Pending must count what the banner counts; and
+  // Submitted must not claim picks nobody has made.
+  if (filters.predictions === 'pending' && !isAskingForPicks(pool)) return false;
   if (filters.predictions === 'submitted' && pool.needsPredictions) return false;
   return true;
 }
@@ -141,8 +148,8 @@ export function applyFilters<T extends FilterablePool>(pools: T[], filters: Pool
         return b.totalPoints - a.totalPoints;
       case 'smart':
       default:
-        if (a.needsPredictions !== b.needsPredictions) {
-          return a.needsPredictions ? -1 : 1;
+        if (isAskingForPicks(a) !== isAskingForPicks(b)) {
+          return isAskingForPicks(a) ? -1 : 1;
         }
         if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
         return a.poolName.localeCompare(b.poolName);

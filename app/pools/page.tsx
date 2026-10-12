@@ -458,6 +458,8 @@ export default async function PoolsPage() {
           return levels.length > 0 ? Math.max(...levels) : 1
         })(),
         has_submitted_predictions: league ? league.hasSubmitted : anySubmitted,
+        // 185's rule: not asked while the matchweek before is being played.
+        picks_due: league ? league.picksDue : true,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         members,

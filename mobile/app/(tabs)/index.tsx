@@ -30,6 +30,7 @@ import { homeCrews } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { homeMatchesFrom } from '@/lib/homeMatches';
 import { pickInviteTarget } from '@/lib/inviteCard';
+import { isAskingForPicks } from '@/lib/needsPredictions';
 import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
 import { crewKeys, useMyCrews } from '@/lib/useCrews';
 import type { PoolSummary } from '@/lib/useHomeData';
@@ -109,7 +110,10 @@ export default function HomeScreen() {
 
   const pools = data?.pools ?? [];
   const hasPools = pools.length > 0;
-  const poolsNeedingPredictions = pools.filter((p) => p.needsPredictions);
+  // ⚠ ASKED, not merely owed: a league pool whose matchweek before is still
+  // being played owes next week's picks and is not chased for them yet — the
+  // banner's half of migration 185. See lib/needsPredictions.ts.
+  const poolsNeedingPredictions = pools.filter(isAskingForPicks);
   // The "needs more players" card: the first small, not-yet-started pool you
   // run whose card you haven't closed on this phone (lib/inviteCard.ts).
   const closedInviteCards = useClosedInviteCards();

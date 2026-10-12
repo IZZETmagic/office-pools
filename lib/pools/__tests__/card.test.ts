@@ -42,6 +42,7 @@ function pool(over: Partial<PoolCardPool> = {}): PoolCardPool {
     current_rank: null,
     highest_level: null,
     has_submitted_predictions: false,
+    picks_due: true,
     memberCount: 8,
     members: [
       { user_id: 'u1', full_name: 'Ryan Sousa', username: 'ryan' },
@@ -111,6 +112,29 @@ describe('poolCardAction — what is left to do', () => {
       // Guards the branch order: `single` is checked before the "N of M" one.
       const a = poolCardAction(pool({ league_mode: 'table', totalMatches: 1, predictedMatches: 0 }), NOW)
       expect(a.label).not.toMatch(/of/)
+    })
+  })
+
+  describe('not asked for yet (185)', () => {
+    // Owed, but the matchweek before is still being played. Ryan: the ask
+    // "should not appear until the matchweek for the pool has completed".
+    it('is still the button, with the same words — picking early is allowed', () => {
+      const a = poolCardAction(pool({ picks_due: false }), NOW)
+      expect(a.label).toBe('Make your picks')
+      expect(a.isButton).toBe(true)
+      expect(poolCardAction(pool({ picks_due: false, predictedMatches: 3 }), NOW).label).toBe('3 of 10 picked')
+    })
+
+    it('is not amber — amber is the ask', () => {
+      expect(poolCardAction(pool({ picks_due: true }), NOW).className).toMatch(/warning/)
+      expect(poolCardAction(pool({ picks_due: false }), NOW).className).not.toMatch(/warning/)
+      expect(poolCardAction(pool({ picks_due: false, predictedMatches: 3 }), NOW).className).not.toMatch(/warning/)
+    })
+
+    it('never reads as done', () => {
+      const a = poolCardAction(pool({ picks_due: false }), NOW)
+      expect(a.icon).not.toBe('check')
+      expect(a.label).not.toMatch(/picked$|set$/i)
     })
   })
 
@@ -189,6 +213,12 @@ describe('byAttention — the dashboard order', () => {
     const done = pool({ pool_id: 'done', predictedMatches: 10 })
     const untouched = pool({ pool_id: 'untouched', predictedMatches: 0 })
     expect([done, untouched].sort(byAttention(unread))[0].pool_id).toBe('untouched')
+  })
+
+  it('sinks a pool not asked for yet with the finished ones (185)', () => {
+    const waiting = pool({ pool_id: 'waiting', predictedMatches: 3, picks_due: false })
+    const untouched = pool({ pool_id: 'untouched', predictedMatches: 0 })
+    expect([waiting, untouched].sort(byAttention(unread))[0].pool_id).toBe('untouched')
   })
 
   it('floats unread banter over pick progress', () => {

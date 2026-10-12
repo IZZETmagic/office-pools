@@ -392,6 +392,9 @@ async function handleGET(
         total_picks: facts ? facts.totalPicks : null,
         made_picks: facts ? facts.madePicks : null,
         has_submitted: facts ? facts.hasSubmitted : null,
+        // Whether to ASK yet — false while the matchweek before is still being
+        // played (185). See `LeagueCardFacts.picksDue`. Null for a World Cup pool.
+        picks_due: facts ? facts.picksDue : null,
         // Table and Last Man Standing are one decision, so the ring is a state
         // rather than a count — there is no "1" worth printing inside it.
         is_single_decision: facts ? isSingleDecision({ league_mode: leagueMode }) : null,

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   deriveProgressiveNeedsPredictions,
+  isAskingForPicks,
+  isWaitingForPicks,
   poolNeedsPredictions,
   type NeedsPredictionsInput,
   type ProgressiveRoundsInput,
@@ -189,5 +191,32 @@ describe('deriveProgressiveNeedsPredictions', () => {
     // look" is the recoverable direction — the opposite silently hides a
     // deadline.
     expect(at({ bestEntryByPool: {} })[POOL]).toBe(true)
+  })
+})
+
+describe('owing a pick is not the same as being asked for one (185)', () => {
+  // Ryan, 2026-10-12: the Home banner "should not appear until the matchweek
+  // for the pool has completed".
+  it('asks for what is owed and due', () => {
+    expect(isAskingForPicks({ needsPredictions: true, picksDue: true })).toBe(true)
+    expect(isWaitingForPicks({ needsPredictions: true, picksDue: true })).toBe(false)
+  })
+
+  it('waits on what is owed while the matchweek before is being played', () => {
+    expect(isAskingForPicks({ needsPredictions: true, picksDue: false })).toBe(false)
+    expect(isWaitingForPicks({ needsPredictions: true, picksDue: false })).toBe(true)
+  })
+
+  it('neither asks nor waits on what is done', () => {
+    for (const picksDue of [true, false]) {
+      expect(isAskingForPicks({ needsPredictions: false, picksDue })).toBe(false)
+      expect(isWaitingForPicks({ needsPredictions: false, picksDue })).toBe(false)
+    }
+  })
+
+  it('⚠ asks when the field is missing — a summary cached before it existed', () => {
+    const cached = { needsPredictions: true } as unknown as { needsPredictions: boolean; picksDue: boolean }
+    expect(isAskingForPicks(cached)).toBe(true)
+    expect(isWaitingForPicks(cached)).toBe(false)
   })
 })

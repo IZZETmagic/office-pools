@@ -65,6 +65,8 @@ type PoolData = {
   table?: TableCardFacts | null
   current_rank: number | null
   has_submitted_predictions: boolean
+  /** 185: false while a league pool's matchweek before is still being played. See lib/pools/card.ts. */
+  picks_due: boolean
   joined_at: string
   memberCount: number
   /** The first three members, for the card's avatar stack. */

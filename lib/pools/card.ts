@@ -91,6 +91,13 @@ export type PoolCardPool = {
    * because the card needs an act to have happened.
    */
   has_submitted_predictions: boolean
+  /**
+   * Whether it is time to ASK for what is owed. False only for a league pool
+   * whose matchweek before the open one is still being played — migration 185's
+   * rule, decided in lib/league/poolCards.ts (`picksDue`). True for every World
+   * Cup pool. Picking early stays one tap away; the pill just stops shouting.
+   */
+  picks_due: boolean
   memberCount: number
   /**
    * The faces at the card's foot — the pool's first few members by `joined_at`,
@@ -184,6 +191,12 @@ export function poolCardAction(pool: PoolCardPool, now: number = Date.now()): Ca
     }
   }
 
+  // Owed, but the matchweek before it is still being played (185). Still the
+  // same button with the same words — picking early is allowed — but not amber:
+  // amber is the ask, and Ryan's rule is that the ask waits for the final
+  // whistle. Neutral, like the Results pill above.
+  const pillClass = pool.picks_due ? 'bg-warning-500 text-white' : 'bg-silver text-ink'
+
   // Part-way through, and this is the state the old pill could not show at all:
   // a member three fixtures into ten read exactly the same as one who had not
   // opened the pool. It cannot happen on a single-decision mode, which is why
@@ -192,12 +205,12 @@ export function poolCardAction(pool: PoolCardPool, now: number = Date.now()): Ca
     return {
       label: `${pool.predictedMatches} of ${pool.totalMatches} picked`,
       icon: 'arrow',
-      className: 'bg-warning-500 text-white',
+      className: pillClass,
       isButton: true,
     }
   }
 
-  return { label: openingLabel(pool), icon: 'arrow', className: 'bg-warning-500 text-white', isButton: true }
+  return { label: openingLabel(pool), icon: 'arrow', className: pillClass, isButton: true }
 }
 
 /**
@@ -374,7 +387,8 @@ function rankUnread(p: PoolCardPool, unread: Map<string, number>): number {
 
 function rankProgress(p: PoolCardPool): number {
   const done = p.totalMatches > 0 && p.predictedMatches >= p.totalMatches
-  if (done || p.has_submitted_predictions) return 2
+  // A pool not being asked yet (185) is not needing attention, whatever is owed.
+  if (done || p.has_submitted_predictions || !p.picks_due) return 2
   return p.predictedMatches > 0 ? 0 : 1
 }
 

@@ -105,6 +105,7 @@ async function main() {
   const scoring = leagueScoring
 
   let anyWithPoints = 0
+  let waiting = 0
   for (const { p, entries, best } of withEntries) {
     const f = facts.get(p.pool_id as string)
     const s = best ? scoring.get(best.entry_id) : undefined
@@ -120,7 +121,7 @@ async function main() {
     const tile = matchweekTile(f ?? {})
     console.log(`   Points ${pts}   Rank ${s?.current_rank ?? '—'} of ${entries.length}   MW ${tile.number ?? '—'} ${tile.caption}   Form ${form.length ? form.join(',') : '(none)'}`)
     console.log(`   in play ${f?.inPlayMatchweekNumber ?? 'none'}   open for picks ${f?.openMatchweekNumber ?? 'none'}   of ${f?.matchweekCount ?? '?'}`)
-    console.log(`   pill "${pill}"   picks ${f?.madePicks ?? 0}/${f?.totalPicks ?? 0}   submitted=${f?.hasSubmitted}`)
+    console.log(`   pill "${pill}"   picks ${f?.madePicks ?? 0}/${f?.totalPicks ?? 0}   submitted=${f?.hasSubmitted}   asked=${f?.picksDue}`)
     console.log(`   clock ${f?.deadlineAt ?? 'none'}   (pools.prediction_deadline was ${p.prediction_deadline})`)
 
     const leagueId = leagueIdByTournament.get(p.tournament_id as string) ?? null
@@ -139,6 +140,20 @@ async function main() {
     if (f && f.openMatchweekNumber !== null && f.totalPicks === 0 && p.league_mode === 'pickem') {
       bad(`${p.pool_name}: an open matchweek with zero fixtures to pick`)
     }
+
+    // 185 on the card: not asked while the matchweek before is being played,
+    // unless the open one is inside its last 24 hours. Asked of the database
+    // independently here, so a wiring slip in the module cannot agree with itself.
+    if (f && p.league_mode !== 'table' && f.openMatchweekNumber !== null && p.league_season_id) {
+      const { data: over, error: overErr } = await admin.rpc('league_in_play_is_over', { p_season_id: p.league_season_id })
+      if (overErr) bad(`${p.pool_name}: league_in_play_is_over failed — ${overErr.message}`)
+      else {
+        const inLastDay = f.deadlineAt !== null && Date.parse(f.deadlineAt) - Date.now() <= 24 * 3600_000
+        const expected = over === true || inLastDay
+        if (f.picksDue !== expected) bad(`${p.pool_name}: asked=${f.picksDue} but the database says ${expected} (over=${over}, last day=${inLastDay})`)
+        if (!f.picksDue) waiting++
+      }
+    }
   }
 
   // The headline: at least one pool must now show points that pool_entries does
@@ -151,6 +166,8 @@ async function main() {
   const stale = withEntries.filter((w) => (w.best?.scored_total_points ?? 0) > 0)
   if (stale.length > 0) bad(`${stale.length} league entries have pool_entries.scored_total_points > 0 — the two sources can disagree`)
   else console.log('    ✓ no league entry carries World Cup totals, so there is one source per pool')
+
+  console.log(`    · ${waiting} pool(s) not asked yet — the matchweek before is still being played (185)`)
 
   console.log(failures === 0 ? '\n✓ all checks passed\n' : `\n✗ ${failures} failed\n`)
   process.exit(failures === 0 ? 0 : 1)

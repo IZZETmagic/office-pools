@@ -5,6 +5,7 @@ import { CompetitionRail } from '@/components/CompetitionRail';
 import { Icon, ProgressRing, Text, Pressable } from '@/components/ui';
 import { getCompetitionColor } from '@/lib/design/competition';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
+import { isAskingForPicks, isWaitingForPicks } from '@/lib/needsPredictions';
 import { poolCardBlocks, type PoolCardBlock } from '@/lib/poolCardBlocks';
 import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
@@ -78,7 +79,13 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   // edge cases wrong: progressive pools where an earlier round was
   // submitted but a new one opened, AND admin-style pools where the
   // user has deleted all their entries.
-  const needsPredictions = pool.needsPredictions;
+  //
+  // ⚠ THREE STATES, NOT TWO, since migration 185's rule reached the card. A
+  // league pool whose matchweek before is still being played owes next week's
+  // picks but is not chased for them: amber would be the banner's nag again,
+  // and "Submitted" would be untrue. It reads as open, quietly.
+  const needsPredictions = isAskingForPicks(pool);
+  const waitingForPicks = isWaitingForPicks(pool);
   // Pool lifecycle state. Once a pool is finished its footer must stop
   // reporting prediction status: "Predictions needed" (amber) is actively
   // misleading on a pool that can no longer be predicted, and "Submitted"
@@ -318,6 +325,20 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
                 />
                 <Text variant="caption" color="amber">
                   Predictions needed
+                </Text>
+              </>
+            ) : waitingForPicks ? (
+              <>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: theme.colors.slate,
+                  }}
+                />
+                <Text variant="caption" color="slate">
+                  Picks open
                 </Text>
               </>
             ) : (

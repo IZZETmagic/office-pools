@@ -71,6 +71,8 @@ type PoolCardData = {
   /** Predict the Table's KPI tiles. NULL for every other mode. */
   table?: TableCardFacts | null
   has_submitted_predictions: boolean
+  /** 185: false while a league pool's matchweek before is still being played. See lib/pools/card.ts. */
+  picks_due: boolean
   predictions_submitted_at: string | null
   predictions_last_saved_at: string | null
   joined_at: string

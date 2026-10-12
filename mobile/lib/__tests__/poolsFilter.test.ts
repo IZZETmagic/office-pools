@@ -23,6 +23,7 @@ function pool(over: Partial<FilterablePool> = {}): FilterablePool {
     predictionMode: 'full_tournament',
     leagueMode: null,
     needsPredictions: false,
+    picksDue: true,
     externalLeagueId: LEAGUE_ID.worldCup,
     brandName: null,
     joinedAt: '2026-06-01T00:00:00Z',
@@ -84,6 +85,27 @@ describe('applyFilters', () => {
     const done = pool({ poolName: 'done' });
     expect(applyFilters([owes, done], f({ predictions: 'pending' }))).toEqual([owes]);
     expect(applyFilters([owes, done], f({ predictions: 'submitted' }))).toEqual([done]);
+  });
+
+  it('⚠ a pool not asked for yet is neither Pending nor Submitted (185)', () => {
+    // Owes next week's picks while this week is being played. Home's banner
+    // does not count it, and the banner opens Pending — so Pending must not
+    // either. Submitted would claim picks nobody has made.
+    const waiting = league('pickem', { poolName: 'waiting', needsPredictions: true, picksDue: false });
+    const asked = league('pickem', { poolName: 'asked', needsPredictions: true });
+    const done = league('pickem', { poolName: 'done' });
+    expect(applyFilters([waiting, asked, done], f({ predictions: 'pending' }))).toEqual([asked]);
+    expect(applyFilters([waiting, asked, done], f({ predictions: 'submitted' }))).toEqual([done]);
+    expect(applyFilters([waiting, asked, done], f({}))).toHaveLength(3);
+  });
+
+  it('the smart sort leads on what is ASKED, not on what is owed', () => {
+    const waiting = league('pickem', { poolName: 'a-waiting', needsPredictions: true, picksDue: false });
+    const asked = league('pickem', { poolName: 'b-asked', needsPredictions: true });
+    expect(applyFilters([waiting, asked], f({ sort: 'smart' })).map((p) => p.poolName)).toEqual([
+      'b-asked',
+      'a-waiting',
+    ]);
   });
 
   it('combines every axis', () => {

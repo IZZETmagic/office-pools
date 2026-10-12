@@ -1593,6 +1593,12 @@ export type HomePoolFacts = {
   totalPicks: number | null;
   madePicks: number | null;
   hasSubmitted: boolean | null;
+  /**
+   * League pools: whether it is time to ask for the open matchweek's picks —
+   * false while the matchweek before it is still being played (migration 185).
+   * NULL on a World Cup pool, and on an API older than the field.
+   */
+  picksDue: boolean | null;
   /** Table and Last Man Standing: one decision, so the ring is a state. */
   isSingleDecision: boolean | null;
   /**
@@ -1656,6 +1662,7 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
       total_picks: number | null;
       made_picks: number | null;
       has_submitted: boolean | null;
+      picks_due?: boolean | null;
       is_single_decision: boolean | null;
       league?: {
         league_mode: string | null;
@@ -1680,6 +1687,7 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
             totalPicks: p.total_picks ?? null,
             madePicks: p.made_picks ?? null,
             hasSubmitted: p.has_submitted ?? null,
+            picksDue: p.picks_due ?? null,
             isSingleDecision: p.is_single_decision ?? null,
             league: p.league
               ? {
