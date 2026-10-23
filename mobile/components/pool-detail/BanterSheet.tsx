@@ -87,6 +87,7 @@ import Animated, {
 import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { ActionMenu, ConfirmDialog, Icon, Text, useSheetChrome, Pressable } from '@/components/ui';
 import { REPORT_REASONS, type ReportReason } from '@/lib/moderation';
 import { PHOTO_MESSAGE_CONTENT, fitPhoto, readPhotoMetadata } from '@/lib/photoMessage';
@@ -293,6 +294,13 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // up. Built once here rather than inside renderAvatar, which runs per message.
   const colourByUserId = useMemo(
     () => new Map(banter.members.map((m) => [m.userId, m.avatarColour] as const)),
+    [banter.members],
+  );
+  // Same reason, for the built avatar. ⚠ The VALUE is the object off the roster query, kept as
+  // is: MemberAvatar composes once per that object (lib/avatar/faceCache.ts), so a copy here
+  // would make every row compose its own.
+  const buildByUserId = useMemo(
+    () => new Map(banter.members.map((m) => [m.userId, m.avatarBuild] as const)),
     [banter.members],
   );
   const { clearPoolUnread, data: homeData } = useHomeData();
@@ -1219,16 +1227,18 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       // No avatar slot on the sent (right) side.
       if (avatarProps.position === 'right') return null;
       const msg = avatarProps.currentMessage as BanterIMessage | undefined;
+      const userId = String(msg?.user._id ?? '');
       return (
         <AvatarSlot
-          userId={String(msg?.user._id ?? '')}
+          userId={userId}
           name={String(msg?.user.name ?? '?')}
           visible={!!msg?._isLastOfGroup}
-          avatarColour={colourByUserId.get(String(msg?.user._id ?? '')) ?? null}
+          avatarColour={colourByUserId.get(userId) ?? null}
+          avatarBuild={buildByUserId.get(userId) ?? null}
         />
       );
     },
-    [colourByUserId],
+    [colourByUserId, buildByUserId],
   );
 
   const renderBubble = useCallback(
@@ -3253,15 +3263,17 @@ async function sendSharePrediction(pred: PredictionOption, sendMessage: SendMess
 // iMessage-style; an 8pt gap left the bubble visibly floating
 // away from the circle.
 //
-// Visible mode: gradient circle (deterministic per userId — same
-// person always gets the same colors) with two-letter username
-// initials.
+// Visible mode: the member's built avatar (MemberAvatar, face-cropped),
+// or — while the art loads, and for anyone who hasn't built one — a
+// gradient circle (deterministic per userId — same person always gets
+// the same colors) with two-letter username initials.
 // Invisible mode: same-sized transparent View (no children).
 const AvatarSlot = memo(function AvatarSlot({
   userId,
   name,
   visible,
   avatarColour,
+  avatarBuild,
 }: {
   userId: string;
   name: string;
@@ -3274,6 +3286,8 @@ const AvatarSlot = memo(function AvatarSlot({
    * colour here while showing their chosen one everywhere else.
    */
   avatarColour?: string | null;
+  /** Their stored avatar off the roster — the same object every row, so it composes once. */
+  avatarBuild?: unknown;
 }) {
   // ⭐ The member's PICKED colour if they have one, else the hash of their id — so every
   // viewer still sees the same colour for the same person. useMemo keeps it stable across
@@ -3297,29 +3311,37 @@ const AvatarSlot = memo(function AvatarSlot({
       }}
     >
       {visible ? (
-        <>
-          <LinearGradient
-            colors={gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          />
-          <RNText
-            style={{
-              color: '#FFFFFF',
-              fontFamily: fontFamilies.bold,
-              fontSize: 13,
-            }}
-          >
-            {getInitials(name)}
-          </RNText>
-        </>
+        <MemberAvatar
+          userId={userId}
+          avatarBuild={avatarBuild ?? null}
+          avatarColour={avatarColour ?? null}
+          size={36}
+          fallback={
+            <>
+              <LinearGradient
+                colors={gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              />
+              <RNText
+                style={{
+                  color: '#FFFFFF',
+                  fontFamily: fontFamilies.bold,
+                  fontSize: 13,
+                }}
+              >
+                {getInitials(name)}
+              </RNText>
+            </>
+          }
+        />
       ) : null}
     </View>
   );

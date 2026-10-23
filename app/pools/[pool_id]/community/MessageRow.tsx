@@ -10,6 +10,7 @@ import type { MemberData } from '../types'
 import type { MemberWithLevel, ReactionCount } from './types'
 import { getInitials, getLevelPillClasses, getRankTitle } from './helpers'
 import { avatarGradient } from '@/lib/design/avatarGradient'
+import { MemberFace } from '@/components/avatar/MemberFace'
 
 function LevelPill({ level }: { level: number }) {
   return (
@@ -129,12 +130,23 @@ export function MessageRow({
         {!isOwn && (
           <div className="shrink-0 w-9 h-9" aria-hidden={!isLastInCluster}>
             {isLastInCluster && (
-              <div
-                className="w-9 h-9 rounded-pill flex items-center justify-center text-[13px] font-bold text-white"
-                style={{ backgroundImage: avatarGradient(userId) }}
-              >
-                {getInitials(author?.users.full_name, author?.users.username)}
-              </div>
+              <MemberFace
+                userId={userId}
+                avatarColour={author?.users.avatar_colour ?? null}
+                avatarBuild={author?.users.avatar_build ?? null}
+                className="w-9 h-9 rounded-pill"
+                fallback={
+                  <div
+                    className="w-9 h-9 rounded-pill flex items-center justify-center text-[13px] font-bold text-white"
+                    // ⚠ The PICKED colour, as on the app and in every Showdown corner. This used to
+                    // pass the id alone, so a member who chose teal was hashed into some other
+                    // colour in the web chat only.
+                    style={{ backgroundImage: avatarGradient(userId, author?.users.avatar_colour) }}
+                  >
+                    {getInitials(author?.users.full_name, author?.users.username)}
+                  </div>
+                }
+              />
             )}
           </div>
         )}

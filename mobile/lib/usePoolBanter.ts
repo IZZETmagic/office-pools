@@ -52,6 +52,11 @@ export type PoolMember = {
   username: string;
   /** The colour they picked. Null = not chosen, so the hash of their id decides. */
   avatarColour: string | null;
+  /**
+   * Their stored avatar, raw — `unknown` until MemberAvatar has checked it against the asset
+   * bundle this build shipped with. Null for a member who has not built one: initials.
+   */
+  avatarBuild: unknown;
 };
 
 // Defined in `banterStable` (pure, testable) alongside the identity-preserving
@@ -83,6 +88,8 @@ type DbUserRow = {
   full_name: string | null;
   username: string | null;
   avatar_colour: string | null;
+  /** Only the member roster (loadMembers) selects it; the sender cache does not need it. */
+  avatar_build?: unknown;
 };
 
 const PAGE_SIZE = 50;
@@ -466,7 +473,7 @@ export function usePoolBanter(poolId: string | undefined) {
       }
       const { data: userRows } = await supabase
         .from('users')
-        .select('user_id, full_name, username, avatar_colour')
+        .select('user_id, full_name, username, avatar_colour, avatar_build')
         .in('user_id', userIds);
       const ms: PoolMember[] = ((userRows as DbUserRow[] | null) ?? [])
         .filter((u) => u.username)
@@ -475,6 +482,7 @@ export function usePoolBanter(poolId: string | undefined) {
           fullName: u.full_name ?? u.username ?? 'Member',
           username: u.username ?? '',
           avatarColour: u.avatar_colour ?? null,
+          avatarBuild: u.avatar_build ?? null,
         }));
       setMembers(ms);
     } catch (err) {

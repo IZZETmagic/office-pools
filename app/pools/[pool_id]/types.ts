@@ -102,6 +102,14 @@ export type MemberData = {
      * member who has chosen renders in two different colours depending on the screen.
      */
     avatar_colour: string | null
+    /**
+     * Their stored avatar, raw — `users.avatar_build`, migration 147. `unknown` until
+     * `readStoredAvatarBuild` has checked it against this deploy's asset bundle.
+     *
+     * Optional because only the pool page's gathering query (lib/poolData.ts) selects it, for
+     * Banter; absent and null both mean initials.
+     */
+    avatar_build?: unknown
   }
   entries?: EntryData[]
 }
