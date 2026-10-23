@@ -43,6 +43,8 @@ export type SeatFact = {
   mode: string
   firstLockAt: string | null
   resolution: 'taken' | 'declined' | 'released' | null
+  /** An archived pool is read-only (044) — "I'm in" could not add you, so it never asks. */
+  archivedAt: string | null
   /** Already in the pool. */
   inPool: number
   /** Still holding an open seat (including this one). */
@@ -76,6 +78,7 @@ export function buildCrewNeeds(
   const out: NeedItem[] = []
 
   for (const s of f.seats) {
+    if (s.archivedAt) continue
     if (seatState({ resolution: s.resolution }, s.firstLockAt, now) !== 'open') continue
     out.push({
       id: `need-crew-seat-${s.poolId}`,
@@ -222,6 +225,7 @@ export async function readCrewNeeds(admin: Admin, userId: string, now: number): 
           mode: modeLabel(p.prediction_mode, p.league_mode),
           firstLockAt: (lock as string | null) ?? null,
           resolution: s.resolution as SeatFact['resolution'],
+          archivedAt: p.archived_at,
           inPool: inPool ?? 0,
           saved: saved ?? 0,
         }

@@ -99,6 +99,7 @@ type MembershipRow = {
     league_mode: string | null
     league_table_lock_at: string | null
     league_start_matchweek: number | null
+    archived_at: string | null
   } | null
   pool_entries: Array<{
     entry_id: string
@@ -215,7 +216,8 @@ async function handleGET(
       pool_id, joined_at,
       pools(
         pool_id, pool_name, prediction_deadline, tournament_id,
-        league_season_id, league_mode, league_table_lock_at, league_start_matchweek
+        league_season_id, league_mode, league_table_lock_at, league_start_matchweek,
+        archived_at
       ),
       pool_entries(
         entry_id, entry_name, entry_number,
@@ -937,6 +939,7 @@ async function handleGET(
         mode: pool.league_mode,
         tableLockAt: pool.league_table_lock_at,
         startMatchweek: pool.league_start_matchweek,
+        archivedAt: pool.archived_at,
         entries: [...(m.pool_entries ?? [])]
           .sort((a, b) => a.entry_number - b.entry_number)
           .map((e) => ({ entryId: e.entry_id, entryName: e.entry_name })),

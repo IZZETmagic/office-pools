@@ -15,6 +15,7 @@ const seat = (o: Partial<SeatFact> = {}): SeatFact => ({
   mode: "Pick'em",
   firstLockAt: '2026-10-05T18:00:00Z',
   resolution: null,
+  archivedAt: null,
   inPool: 6,
   saved: 3,
   ...o,
@@ -58,6 +59,10 @@ describe('the three crew cards', () => {
   it('a seat disappears once answered or once the pool locks', () => {
     expect(buildCrewNeeds({ seats: [seat({ resolution: 'taken' })], invites: [], saves: [] }, NOW)).toEqual([])
     expect(buildCrewNeeds({ seats: [seat({ firstLockAt: '2026-10-01T00:00:00Z' })], invites: [], saves: [] }, NOW)).toEqual([])
+  })
+
+  it('a seat in an archived pool is never asked — the pool is read-only', () => {
+    expect(buildCrewNeeds({ seats: [seat({ archivedAt: '2026-10-01T00:00:00Z' })], invites: [], saves: [] }, NOW)).toEqual([])
   })
   it('an invite names who added you, has no deadline, and carries the invite id for the answer', () => {
     const [card] = buildCrewNeeds({ seats: [], invites: [invite()], saves: [] }, NOW)

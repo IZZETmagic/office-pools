@@ -42,6 +42,12 @@ export type LeagueActivityPool = {
   mode: string | null
   tableLockAt: string | null
   startMatchweek: number | null
+  /**
+   * `pools.archived_at` (migration 040). An archived pool keeps its history — its matchweek stories
+   * still read — but never asks for anything in Needs You: it is read-only (044), so the button
+   * would lead nowhere.
+   */
+  archivedAt: string | null
   /** The viewer's entries, lowest entry_number first. */
   entries: Array<{ entryId: string; entryName: string }>
   entrantCount: number | null
@@ -63,7 +69,8 @@ export async function readLeagueNeeds(
   pools: LeagueActivityPool[],
   now: number,
 ): Promise<NeedItem[]> {
-  const league = leaguePoolsOf(pools)
+  // Archived before the facts read, not after: that read is most of this route's cost.
+  const league = leaguePoolsOf(pools).filter((p) => !p.archivedAt)
   if (league.length === 0) return []
   const facts = await readLeagueCardFacts(
     admin,
