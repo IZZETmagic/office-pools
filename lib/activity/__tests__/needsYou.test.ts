@@ -15,6 +15,7 @@ const facts = (over: Partial<LeagueCardFacts> = {}): LeagueCardFacts => ({
   completedPicks: 0,
   madePicks: 3,
   hasSubmitted: false,
+  picksDue: true,
   showdown: null,
   lms: null,
   table: null,
@@ -102,6 +103,56 @@ describe('buildNeedsYou', () => {
       NOW,
     )
     expect(out.map((n) => n.pool_id)).toEqual(['b', 'a'])
+  })
+
+  // Ryan, 2026-10-31: the next matchweek is not asked for until the one being
+  // played is over. `picksDue` carries 185's answer; Needs you only obeys it.
+  describe('waits for the matchweek being played', () => {
+    const lms = {
+      roundsWon: 0,
+      roundNumber: 2,
+      isEliminated: false,
+      eliminatedMatchweek: null,
+      survivorsLeft: 9,
+      roundEntrants: 14,
+      clubsUsed: 5,
+      clubPool: 20,
+      inPlayClubName: null,
+      inPlayMatchweek: null,
+      inPlayClubCrest: null,
+      openClubName: null,
+      openMatchweek: 7,
+      openClubCrest: null,
+    }
+
+    it("holds a Pick'em or Showdown week that is open but not yet asked for", () => {
+      const held = facts({ picksDue: false })
+      expect(buildNeedsYou([pool('a', 'pickem'), pool('b', 'showdown')], new Map([['a', held], ['b', held]]), NOW)).toEqual([])
+    })
+
+    it('holds an LMS pick the same way', () => {
+      const out = buildNeedsYou(
+        [pool('a', 'last_man_standing')],
+        new Map([['a', facts({ totalPicks: 1, madePicks: 0, lms, picksDue: false })]]),
+        NOW,
+      )
+      expect(out).toEqual([])
+    })
+
+    it('asks once the matchweek being played is over — the same facts, picksDue now true', () => {
+      const [n] = buildNeedsYou([pool('a', 'pickem')], new Map([['a', facts({ picksDue: true })]]), NOW)
+      expect(n.title).toBe('Pick Matchweek 7')
+    })
+
+    it('never holds a table order: Table mode has its own lock', () => {
+      // poolCards.ts always answers true for Table; even a false must not hide it.
+      const [n] = buildNeedsYou(
+        [pool('a', 'table')],
+        new Map([['a', facts({ openMatchweekNumber: null, totalPicks: 1, madePicks: 0, picksDue: false })]]),
+        NOW,
+      )
+      expect(n.kind).toBe('table')
+    })
   })
 
   it('skips a pool with no entry or no facts', () => {

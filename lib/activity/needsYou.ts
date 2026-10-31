@@ -6,6 +6,10 @@
 // pool cards read, so a card leaves the moment the pick is made, and the Pools
 // tab and the Activity tab cannot disagree about whether a week is done.
 //
+// A matchweek's card ARRIVES when the Home banner asks for it (`picksDue`): once
+// the matchweek being played is over, not when the next one opens at its lock.
+// The app's Activity tab dot is `needs_you.length`, so it waits with it.
+//
 // Disclosure gate (CLAUDE.md): "This lists picks that are still open, and goes
 // away when you've made them." Passes — it is a to-do list, not a nudge.
 //
@@ -117,6 +121,14 @@ export function buildNeedsYou(
     }
 
     if (f.openMatchweekNumber == null) continue
+    // Not while the matchweek before it is still being played. Ryan, 2026-10-31:
+    // "Push notification, email notifications and the in app needs you activity
+    // for unlocked match weeks should not happen until the current pool's match
+    // week is completed." `picksDue` is the banner's answer (185's rule, read
+    // from the database in poolCards.ts) — never re-derived here. Inside the
+    // open matchweek's last 24 hours it is true regardless: the deadline is
+    // never held.
+    if (!f.picksDue) continue
     const mw = f.openMatchweekNumber
 
     if (p.mode === 'last_man_standing') {
